@@ -1,0 +1,50 @@
+<?php
+// Account Control Logic - Locked account management
+require_once 'admin_auth.php';
+
+$lockedUsers = [];
+
+// Fetch locked users
+try {
+    $stmt = $pdo->query("
+        SELECT
+            id,
+            full_name,
+            email,
+            role,
+            login_attempts,
+            locked_until
+        FROM users
+        WHERE locked_until IS NOT NULL
+        ORDER BY full_name ASC
+    ");
+    $lockedUsers = $stmt->fetchAll();
+} catch (PDOException $e) {
+    $error = $e->getMessage();
+}
+
+// Handle unlock user action
+if (isset($_GET['unlock_id'])) {
+    $userId = (int)$_GET['unlock_id'];
+
+    try {
+        $stmt = $pdo->prepare("
+            UPDATE users
+            SET
+                login_attempts = 0,
+                locked_until = NULL
+            WHERE id = ?
+        ");
+        $stmt->execute([$userId]);
+        redirectSuccess(
+            'account_control.php',
+            'User account unlocked successfully.'
+        );
+    } catch (PDOException $e) {
+        redirectError(
+            'account_control.php',
+            $e->getMessage()
+        );
+    }
+}
+?>
