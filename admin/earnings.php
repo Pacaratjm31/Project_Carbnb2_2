@@ -11,6 +11,8 @@ $verifiedRevenue = 0;
 $pendingRevenue = 0;
 $months = [];
 $revenues = [];
+$chartLabels = [];
+$chartData = [];
 
 // Total Revenue (All Status)
 try {
@@ -24,14 +26,14 @@ try {
     ");
     $total = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    $totalRevenue = $total['total_revenue'] ?? 0;
-    $totalTransactions = $total['total_transactions'] ?? 0;
-    $verifiedRevenue = $total['verified_revenue'] ?? 0;
-    $pendingRevenue = $total['pending_revenue'] ?? 0;
+    $totalRevenue = (float) ($total['total_revenue'] ?? 0);
+    $totalTransactions = (int) ($total['total_transactions'] ?? 0);
+    $verifiedRevenue = (float) ($total['verified_revenue'] ?? 0);
+    $pendingRevenue = (float) ($total['pending_revenue'] ?? 0);
 
-    // Calculate commission (20%) and owner income (80%)
-    $totalCommission = $totalRevenue * 0.20;
-    $totalOwnerIncome = $totalRevenue * 0.80;
+    // Calculate commission (20%) and owner income (80%) based on verified revenue
+    $totalCommission = $verifiedRevenue * 0.20;
+    $totalOwnerIncome = $verifiedRevenue * 0.80;
 
     // Monthly Data (Only Verified)
     $stmt2 = $pdo->query("
@@ -46,8 +48,8 @@ try {
     $data = $stmt2->fetchAll(PDO::FETCH_ASSOC);
 
     foreach ($data as $row) {
-        $months[] = $row['month'];
-        $revenues[] = $row['revenue'];
+        $chartLabels[] = $row['month'];
+        $chartData[] = (float) $row['revenue'];
     }
 } catch (PDOException $e) {
     $error = $e->getMessage();
@@ -331,10 +333,10 @@ try {
     new Chart(document.getElementById('chart'), {
       type: 'bar',
       data: {
-        labels: <?= json_encode($months) ?>,
+        labels: <?= json_encode($chartLabels) ?>,
         datasets: [{
-          label: 'Revenue',
-          data: <?= json_encode($revenues) ?>,
+          label: 'Verified Revenue',
+          data: <?= json_encode($chartData) ?>,
           backgroundColor: '#4cc9f0'
         }]
       },

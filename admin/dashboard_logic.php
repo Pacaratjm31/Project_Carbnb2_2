@@ -67,6 +67,14 @@ try {
     ");
     $totalPayments = (int)$stmt->fetchColumn();
 
+    // Total verified revenue for dashboard summary
+    $stmt = $pdo->query("
+        SELECT COALESCE(SUM(amount), 0)
+        FROM payments
+        WHERE status = 'verified'
+    ");
+    $verifiedRevenueTotal = (float)$stmt->fetchColumn();
+
     // Pending Users
     $stmt = $pdo->query("
         SELECT COUNT(*)

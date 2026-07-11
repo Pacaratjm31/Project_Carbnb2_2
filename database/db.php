@@ -59,6 +59,10 @@ try {
     ensure_column($pdo, 'vehicles', 'approval_status', "ENUM('pending','approved','disapproved') DEFAULT 'pending'");
     ensure_column($pdo, 'bookings', 'total_days', 'INT NOT NULL DEFAULT 1');
     ensure_column($pdo, 'bookings', 'total_price', 'DECIMAL(10,2) NOT NULL DEFAULT 0.00');
+    ensure_column($pdo, 'payments', 'payment_method', "ENUM('gcash','paymaya','cash','bank_transfer') NULL");
+    ensure_column($pdo, 'payments', 'transaction_reference', 'VARCHAR(100) NULL');
+    ensure_column($pdo, 'payments', 'gateway_response', 'TEXT NULL');
+    ensure_column($pdo, 'payments', 'paid_at', 'DATETIME NULL');
 
 } catch (PDOException $e) {
 

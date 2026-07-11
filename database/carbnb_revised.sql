@@ -97,6 +97,10 @@ CREATE TABLE payments (
 
     amount DECIMAL(10,2) NOT NULL,
     proof_image VARCHAR(255) NULL,
+    payment_method ENUM('gcash','paymaya','cash','bank_transfer') NULL,
+    transaction_reference VARCHAR(100) NULL,
+    gateway_response TEXT NULL,
+    paid_at DATETIME NULL,
 
     status ENUM('pending','verified','disapproved') DEFAULT 'pending',
 

@@ -82,6 +82,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         die('Upload receipt required.');
     }
 
+    $transactionReference = trim((string) ($_POST['transaction_reference'] ?? ''));
+
     $tmp = $_FILES['receipt']['tmp_name'];
     $size = (int) ($_FILES['receipt']['size'] ?? 0);
     $ext = strtolower(pathinfo($_FILES['receipt']['name'], PATHINFO_EXTENSION));
@@ -104,16 +106,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     move_uploaded_file($tmp, $uploadDir . $fileName);
 
     $amount = (float) $data['total_price'];
+    $reference = $transactionReference !== '' ? $transactionReference : 'CARBNB-' . strtoupper(bin2hex(random_bytes(4))) . '-' . $booking_id;
+    $gatewayResponse = 'Payment submitted through renter form using ' . $method . '.';
 
     $check = $conn->prepare('SELECT id FROM payments WHERE booking_id = ?');
     $check->execute([$booking_id]);
 
     if ($check->rowCount() > 0) {
-        $update = $conn->prepare("UPDATE payments SET amount = ?, proof_image = ?, status = 'pending' WHERE booking_id = ?");
-        $update->execute([$amount, $fileName, $booking_id]);
+        $update = $conn->prepare("UPDATE payments SET amount = ?, proof_image = ?, payment_method = ?, transaction_reference = ?, gateway_response = ?, status = 'pending', paid_at = NOW() WHERE booking_id = ?");
+        $update->execute([$amount, $fileName, $method, $reference, $gatewayResponse, $booking_id]);
     } else {
-        $insert = $conn->prepare("INSERT INTO payments (booking_id, amount, proof_image, status) VALUES (?, ?, ?, 'pending')");
-        $insert->execute([$booking_id, $amount, $fileName]);
+        $insert = $conn->prepare("INSERT INTO payments (booking_id, amount, proof_image, payment_method, transaction_reference, gateway_response, status, paid_at) VALUES (?, ?, ?, ?, ?, ?, 'pending', NOW())");
+        $insert->execute([$booking_id, $amount, $fileName, $method, $reference, $gatewayResponse]);
     }
 
     header('Location: paid.php?booking_id=' . $booking_id);
@@ -171,7 +175,7 @@ $imagePath = build_vehicle_image_path($data['car_image'] ?? '');
         <p><strong>PayMaya:</strong> 09876543210</p>
     </div>
 
-    <form method="POST" enctype="multipart/form-data" class="payment-form">
+    <form method="POST" enctype="multipart/form-data" class="payment-form" id="paymentForm">
 
         <label>Payment Method</label>
         <select name="method" required>
@@ -181,13 +185,71 @@ $imagePath = build_vehicle_image_path($data['car_image'] ?? '');
             <option value="bank_transfer">Bank Transfer</option>
         </select>
 
+        <label>Transaction Reference</label>
+        <input type="text" name="transaction_reference" placeholder="Optional reference number" maxlength="100">
+
         <label>Upload Receipt</label>
-        <input type="file" name="receipt" required>
+        <input type="file" name="receipt" required accept="image/png,image/jpeg">
 
         <button class="btn" type="submit">Submit Payment</button>
+        <button class="btn" type="button" id="payWithStripe">Pay with Stripe</button>
         <a href="javascript:history.back()" class="btn-return">← Return</a>
 
     </form>
+
+    <script>
+    document.getElementById('paymentForm')?.addEventListener('submit', async function (event) {
+        event.preventDefault();
+
+        const fileInput = this.querySelector('input[name="receipt"]');
+        if (fileInput && fileInput.files.length === 0) {
+            alert('Please select a receipt image before submitting.');
+            return;
+        }
+
+        const formData = new FormData(this);
+        formData.append('booking_id', '<?= (int) $booking_id ?>');
+
+        try {
+            const response = await fetch('payment_api.php', {
+                method: 'POST',
+                body: formData
+            });
+            const result = await response.json();
+
+            if (result.success) {
+                window.location.href = 'record.php';
+            } else {
+                alert(result.message || 'Unable to submit payment.');
+            }
+        } catch (error) {
+            console.error(error);
+            alert('Payment submission failed. Please try again.');
+        }
+    });
+
+    document.getElementById('payWithStripe')?.addEventListener('click', async function () {
+        const formData = new FormData();
+        formData.append('booking_id', '<?= (int) $booking_id ?>');
+
+        try {
+            const response = await fetch('payment_gateway.php', {
+                method: 'POST',
+                body: formData
+            });
+            const result = await response.json();
+
+            if (result.success && result.checkout_url) {
+                window.location.href = result.checkout_url;
+            } else {
+                alert(result.message || 'Unable to start Stripe Checkout.');
+            }
+        } catch (error) {
+            console.error(error);
+            alert('Stripe checkout could not be started.');
+        }
+    });
+    </script>
 
 </div>
 

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Carbnb Mobile</title>
+  <style>
+    :root { color-scheme: dark; --bg:#111; --card:#1d1d1d; --accent:#ffd700; --muted:#aaa; }
+    * { box-sizing:border-box; font-family:Segoe UI, Arial, sans-serif; }
+    body { margin:0; background:var(--bg); color:#fff; }
+    .app { max-width:480px; margin:0 auto; padding:20px 16px 40px; }
+    .hero { background:linear-gradient(135deg,#2a2a2a,#111); border:1px solid #333; border-radius:16px; padding:18px; margin-bottom:16px; }
+    .hero h1 { margin:0 0 8px; color:var(--accent); font-size:1.3rem; }
+    .hero p { margin:0; color:var(--muted); }
+    .card { background:var(--card); border:1px solid #333; border-radius:14px; padding:14px; margin-bottom:12px; }
+    .row { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+    .pill { display:inline-block; padding:6px 10px; border-radius:999px; background:#243b2b; color:#8eea96; font-size:0.8rem; }
+    button, a.btn { display:block; width:100%; text-align:center; padding:12px; border:none; border-radius:10px; background:linear-gradient(90deg,#ffd700,#ffcf66); color:#111; font-weight:700; text-decoration:none; margin-top:10px; }
+    .small { font-size:0.9rem; color:var(--muted); }
+    ul { padding-left:18px; color:var(--muted); }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="hero">
+      <h1>Carbnb Mobile</h1>
+      <p>Book, pay, and track rentals from your phone.</p>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <strong>System Status</strong>
+        <span id="statusValue" class="pill">Checking...</span>
+      </div>
+      <p id="healthText" class="small">Connecting to the Carbnb API...</p>
+      <a class="btn" href="../renter/paid.php?booking_id=1">Open Payment Page</a>
+    </div>
+
+    <div class="card">
+      <strong>What this app supports</strong>
+      <ul>
+        <li>Responsive renter dashboard</li>
+        <li>Booking and payment flow</li>
+        <li>Admin earnings and payment tracking</li>
+      </ul>
+    </div>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
