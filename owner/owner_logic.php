@@ -1,5 +1,7 @@
 <?php
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 require_once __DIR__ . '/../database/db.php';
 
 function column_exists(PDO $pdo, string $table, string $column): bool {
@@ -211,7 +213,7 @@ function get_owner_history(PDO $pdo, int $owner_id): array {
         return [];
     }
 
-    $stmt = $pdo->prepare("SELECT b.id, b.start_date, b.end_date, b.total_price, b.status, v.name AS vehicle_name, u.full_name AS renter_name FROM bookings b JOIN vehicles v ON v.id = b.vehicle_id JOIN users u ON u.id = b.renter_id WHERE v.owner_id = ? AND b.status = 'completed' ORDER BY b.created_at DESC");
+    $stmt = $pdo->prepare("SELECT b.id, b.start_date, b.end_date, b.total_price, b.status, v.name AS vehicle_name, u.full_name AS renter_name FROM bookings b JOIN vehicles v ON v.id = b.vehicle_id JOIN users u ON u.id = b.renter_id WHERE v.owner_id = ? ORDER BY b.created_at DESC");
     $stmt->execute([$owner_id]);
     return $stmt->fetchAll();
 }
@@ -221,9 +223,19 @@ function get_owner_messages(PDO $pdo, int $owner_id): array {
         return [];
     }
 
-    $stmt = $pdo->prepare("SELECT m.id, m.message, m.is_read, m.created_at, s.full_name AS sender_name, r.full_name AS receiver_name FROM messages m LEFT JOIN users s ON s.id = m.sender_id LEFT JOIN users r ON r.id = m.receiver_id WHERE (m.sender_id = ? OR m.receiver_id = ?) ORDER BY m.created_at DESC");
+    $stmt = $pdo->prepare("SELECT m.id, m.message, m.is_read, m.created_at, m.sender_id, m.receiver_id, s.full_name AS sender_name, s.role AS sender_role, r.full_name AS receiver_name, r.role AS receiver_role FROM messages m LEFT JOIN users s ON s.id = m.sender_id LEFT JOIN users r ON r.id = m.receiver_id WHERE (m.sender_id = ? OR m.receiver_id = ?) ORDER BY m.created_at DESC");
     $stmt->execute([$owner_id, $owner_id]);
     return $stmt->fetchAll();
+}
+
+function get_unread_message_count(PDO $pdo, int $owner_id): int {
+    if ($owner_id <= 0) {
+        return 0;
+    }
+
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM messages WHERE receiver_id = ? AND is_read = 0");
+    $stmt->execute([$owner_id]);
+    return (int) $stmt->fetchColumn();
 }
 
 function get_owner_reviews(PDO $pdo, int $owner_id): array {
@@ -231,7 +243,7 @@ function get_owner_reviews(PDO $pdo, int $owner_id): array {
         return [];
     }
 
-    $stmt = $pdo->prepare("SELECT r.id, r.rating, r.comment, r.created_at, u.full_name AS renter_name, v.name AS vehicle_name FROM reviews r JOIN users u ON u.id = r.renter_id JOIN vehicles v ON v.id = r.vehicle_id WHERE r.owner_id = ? ORDER BY r.created_at DESC");
+    $stmt = $pdo->prepare("SELECT r.id, r.rating, r.feedback, r.comment, r.reply, r.created_at, u.full_name AS renter_name, v.name AS vehicle_name FROM reviews r JOIN users u ON u.id = r.renter_id LEFT JOIN vehicles v ON v.id = r.vehicle_id WHERE r.owner_id = ? ORDER BY r.created_at DESC");
     $stmt->execute([$owner_id]);
     return $stmt->fetchAll();
 }
@@ -250,6 +262,15 @@ function create_vehicle(PDO $pdo, int $owner_id, array $data, array $files = [])
     }
     if ($model_year === '' || !is_numeric($model_year) || (int) $model_year < 1900) {
         $errors[] = 'A valid model year is required.';
+    }
+
+    // Check for duplicate vehicle name for this owner
+    if ($name !== '' && $owner_id > 0) {
+        $stmt = $pdo->prepare("SELECT id FROM vehicles WHERE owner_id = ? AND name = ? AND is_deleted = 0");
+        $stmt->execute([$owner_id, $name]);
+        if ($stmt->fetch()) {
+            $errors[] = 'A vehicle with this name already exists.';
+        }
     }
 
     if ($errors) {
@@ -357,6 +378,37 @@ function status_badge_class(string $status): string {
         'pending' => 'pending',
         'rented' => 'active',
         'maintenance' => 'pending',
+        'return_requested' => 'pending',
         default => 'pending',
     };
+}
+
+function make_vehicle_available(PDO $pdo, int $owner_id, int $vehicle_id): array {
+    if ($owner_id <= 0 || $vehicle_id <= 0) {
+        return ['success' => false, 'message' => 'Invalid parameters.'];
+    }
+
+    // Verify the vehicle belongs to this owner
+    $stmt = $pdo->prepare("SELECT id, availability_status FROM vehicles WHERE id = ? AND owner_id = ? AND is_deleted = 0");
+    $stmt->execute([$vehicle_id, $owner_id]);
+    $vehicle = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$vehicle) {
+        return ['success' => false, 'message' => 'Vehicle not found or does not belong to you.'];
+    }
+
+    // Check if vehicle has any active bookings (pending or approved)
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM bookings WHERE vehicle_id = ? AND status IN ('pending', 'approved')");
+    $stmt->execute([$vehicle_id]);
+    $active_bookings = (int) $stmt->fetchColumn();
+
+    if ($active_bookings > 0) {
+        return ['success' => false, 'message' => 'Cannot make available. Vehicle has active bookings.'];
+    }
+
+    // Update vehicle status to available
+    $stmt = $pdo->prepare("UPDATE vehicles SET availability_status = 'available' WHERE id = ?");
+    $stmt->execute([$vehicle_id]);
+
+    return ['success' => true, 'message' => 'Vehicle is now available.'];
 }

@@ -297,6 +297,9 @@ content="width=device-width, initial-scale=1.0"
 >
 
 <style>
+    body {
+        background:#1e1e1e;
+    }
     .navigate {
          display: flex;
          justify-content: center;

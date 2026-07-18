@@ -1,5 +1,7 @@
 <?php
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 include '../database/db.php';
 $conn = $conn ?? $GLOBALS['conn'] ?? $GLOBALS['pdo'] ?? null;
 
@@ -42,6 +44,7 @@ if (($renter['status'] ?? 'pending') !== 'approved') {
         <title>Profile Restricted | Carbnb</title>
         <link rel="stylesheet" href="../bootstrap-5.3.8-dist/css/bootstrap.min.css">
         <link rel="stylesheet" href="css/renter_style.css?v=2">
+        <link rel="stylesheet" href="css/renter_style_backup.css?v=4">
     </head>
     <body>
         <div class="container profile-container">
@@ -178,6 +181,7 @@ function build_upload_path($value): string {
     <title>My Profile | Carbnb</title>
     <link rel="stylesheet" href="../bootstrap-5.3.8-dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="css/renter_style.css?v=2">
+    <link rel="stylesheet" href="css/renter_style_backup.css?v=4">
 </head>
 <body>
 

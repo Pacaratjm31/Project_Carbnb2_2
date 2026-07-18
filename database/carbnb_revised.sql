@@ -125,9 +125,10 @@ CREATE TABLE reviews (
     id INT AUTO_INCREMENT PRIMARY KEY,
     renter_id INT NOT NULL,
     owner_id INT NOT NULL,
-    vehicle_id INT NOT NULL,
+    vehicle_id INT NULL,
 
     rating INT CHECK (rating BETWEEN 1 AND 5),
+    feedback TEXT,
     comment TEXT,
     reply TEXT NULL,
 
@@ -170,4 +171,23 @@ CREATE TABLE contact_messages (
     is_replied TINYINT(1) DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     replied_at DATETIME NULL
+);
+
+CREATE TABLE inspect (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    booking_id INT NOT NULL,
+    renter_id INT NOT NULL,
+    owner_id INT NOT NULL,
+    vehicle_id INT NOT NULL,
+    front_image VARCHAR(255) NULL,
+    back_image VARCHAR(255) NULL,
+    left_image VARCHAR(255) NULL,
+    right_image VARCHAR(255) NULL,
+    reason TEXT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE CASCADE,
+    FOREIGN KEY (renter_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (vehicle_id) REFERENCES vehicles(id) ON DELETE CASCADE
 );

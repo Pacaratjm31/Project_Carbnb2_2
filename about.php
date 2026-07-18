@@ -9,7 +9,7 @@
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Arial, sans-serif; }
 
         body {
-            background-color: #1e1e1e; /* Dark background */
+            background:#1e1e1e;
             color: #cfcfcf;            /* Light text */
             display: flex;
             flex-direction: column;

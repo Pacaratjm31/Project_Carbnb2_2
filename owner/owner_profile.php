@@ -122,9 +122,9 @@ function build_owner_upload_path($value): string {
 <body>
   <div class="overlay"></div>
   <aside class="sidebar">
-    <div class="sidebar-header">
+<div class="sidebar-header">
       <h2>Carbnb Owner</h2>
-      <button class="sidebar-close" type="button">×</button>
+      <button class="sidebar-close" type="button" aria-label="Close sidebar"></button>
     </div>
     <nav class="sidebar-nav">
       <a href="owner_dashboard.php">Dashboard</a>
@@ -142,8 +142,8 @@ function build_owner_upload_path($value): string {
   </aside>
 
   <div class="main-content">
-    <header class="topbar">
-      <button class="sidebar-toggle" type="button">☰</button>
+<header class="topbar">
+      <button class="sidebar-toggle" type="button" aria-label="Open sidebar"></button>
       <h1>Profile</h1>
       <a class="topbar-action" href="owner_dashboard.php">Home</a>
     </header>

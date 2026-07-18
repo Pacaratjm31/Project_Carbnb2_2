@@ -108,10 +108,10 @@ if ($distance <= $threshold) {
         ");
         $update->execute([$userId]);
 
-        echo json_encode([
+echo json_encode([
             'success' => true,
             'distance' => round($distance, 4),
-            'redirect' => '/Carbnb_project2/renter/browse.php'
+            'redirect' => '../renter/browse.php'
         ]);
     } else {
         http_response_code(401);

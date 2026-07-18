@@ -21,12 +21,17 @@ $vehicles = get_owner_vehicles($pdo, $owner['id']);
 $available = 0;
 $rented = 0;
 $maintenance = 0;
+$maintenance_vehicles = [];
+
 foreach ($vehicles as $vehicle) {
     // Only count approved vehicles in status summary
     if ($vehicle['approval_status'] === 'approved') {
         if ($vehicle['availability_status'] === 'available') $available++;
         elseif ($vehicle['availability_status'] === 'rented') $rented++;
-        elseif ($vehicle['availability_status'] === 'maintenance') $maintenance++;
+        elseif ($vehicle['availability_status'] === 'maintenance') {
+            $maintenance++;
+            $maintenance_vehicles[] = $vehicle;
+        }
     }
 }
 ?>
@@ -41,9 +46,9 @@ foreach ($vehicles as $vehicle) {
 <body>
   <div class="overlay"></div>
   <aside class="sidebar">
-    <div class="sidebar-header">
+<div class="sidebar-header">
       <h2>Carbnb Owner</h2>
-      <button class="sidebar-close" type="button">×</button>
+      <button class="sidebar-close" type="button" aria-label="Close sidebar"></button>
     </div>
     <nav class="sidebar-nav">
       <a href="owner_dashboard.php">Dashboard</a>
@@ -61,8 +66,8 @@ foreach ($vehicles as $vehicle) {
   </aside>
 
   <div class="main-content">
-    <header class="topbar">
-      <button class="sidebar-toggle" type="button">☰</button>
+<header class="topbar">
+      <button class="sidebar-toggle" type="button" aria-label="Open sidebar"></button>
       <h1>Vehicle Status</h1>
       <a class="topbar-action" href="owner_profile.php">Profile</a>
     </header>
@@ -82,9 +87,36 @@ foreach ($vehicles as $vehicle) {
           <p><?php echo $maintenance; ?> vehicle(s)</p>
         </div>
       </section>
+
+      <?php if (!empty($maintenance_vehicles)): ?>
+      <section class="card" style="margin-top:20px;">
+        <h3 class="section-title">Vehicles Under Maintenance</h3>
+        <div class="table-wrapper">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Vehicle</th>
+                <th>Category</th>
+                <th>Price</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <?php foreach ($maintenance_vehicles as $vehicle): ?>
+                <tr>
+                  <td><?php echo htmlspecialchars($vehicle['name']); ?></td>
+                  <td><?php echo htmlspecialchars(str_replace('_', ' ', $vehicle['category'])); ?></td>
+                  <td><?php echo format_currency($vehicle['price_per_day']); ?>/day</td>
+                  <td><span class="status-badge pending"><?php echo htmlspecialchars(status_label($vehicle['availability_status'])); ?></span></td>
+                </tr>
+              <?php endforeach; ?>
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <?php endif; ?>
     </main>
   </div>
 
   <script src="js/owner_script.js"></script>
 </body>
-</html>

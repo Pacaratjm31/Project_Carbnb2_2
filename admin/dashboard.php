@@ -7,14 +7,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin Dashboard | Carbnb</title>
   <link rel="stylesheet" href="css/admin_style.css?v=20260702">
+  <link rel="stylesheet" href="css/admin_style_backup.css?v=20260702">
 </head>
 <body>
   <div class="overlay"></div>
   
   <aside class="sidebar">
-    <div class="sidebar-header">
+<div class="sidebar-header">
       <h2>Carbnb Admin</h2>
-      <button class="sidebar-close" type="button">×</button>
+      <button class="sidebar-close" type="button" aria-label="Close sidebar"></button>
     </div>
     <nav class="sidebar-nav">
       <a class="active" href="dashboard.php">Dashboard</a>
@@ -31,8 +32,8 @@
   </aside>
 
   <div class="main-content">
-    <header class="topbar">
-      <button class="sidebar-toggle" type="button">☰</button>
+<header class="topbar">
+      <button class="sidebar-toggle" type="button" aria-label="Open sidebar"></button>
       <h1>Admin Dashboard</h1>
     </header>
 

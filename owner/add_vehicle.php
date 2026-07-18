@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/owner_logic.php';
+include __DIR__ . '/../helpers/duplicate_functions.php';
 $pdo = get_owner_pdo();
 $owner = get_current_owner($pdo);
 
@@ -21,13 +22,20 @@ $message = '';
 $type = 'success';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $result = create_vehicle($pdo, $owner['id'], $_POST, $_FILES);
-    if ($result['success']) {
-        $message = 'Vehicle created and submitted for approval.';
-        $type = 'success';
-    } else {
-        $message = implode(' ', $result['errors']);
+    // Validate form token to prevent duplicate submissions
+    $tokenError = validate_form_token_or_error('add_vehicle');
+    if ($tokenError) {
+        $message = $tokenError;
         $type = 'error';
+    } else {
+        $result = create_vehicle($pdo, $owner['id'], $_POST, $_FILES);
+        if ($result['success']) {
+            header('Location: manage_vehicles.php?success=' . urlencode('Vehicle created and submitted for approval.'));
+            exit();
+        } else {
+            $message = implode(' ', $result['errors']);
+            $type = 'error';
+        }
     }
 }
 ?>
@@ -42,9 +50,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body>
   <div class="overlay"></div>
   <aside class="sidebar">
-    <div class="sidebar-header">
+<div class="sidebar-header">
       <h2>Carbnb Owner</h2>
-      <button class="sidebar-close" type="button">×</button>
+      <button class="sidebar-close" type="button" aria-label="Close sidebar"></button>
     </div>
     <nav class="sidebar-nav">
       <a href="owner_dashboard.php">Dashboard</a>
@@ -62,8 +70,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   </aside>
 
   <div class="main-content">
-    <header class="topbar">
-      <button class="sidebar-toggle" type="button">☰</button>
+<header class="topbar">
+      <button class="sidebar-toggle" type="button" aria-label="Open sidebar"></button>
       <h1>Add New Vehicle</h1>
       <a class="topbar-action" href="owner_profile.php">Profile</a>
     </header>
@@ -73,10 +81,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <?php if ($message !== '') : ?>
           <div class="alert <?php echo htmlspecialchars($type); ?>"><?php echo htmlspecialchars($message); ?></div>
         <?php endif; ?>
-        <form method="post" enctype="multipart/form-data">
+        <form method="post" enctype="multipart/form-data" id="addVehicleForm">
           <label>Vehicle Name
             <input type="text" name="name" required>
           </label>
+          <?= form_token_input('add_vehicle') ?>
           <label>Model Year
             <input type="number" name="model_year" min="1900" required>
           </label>

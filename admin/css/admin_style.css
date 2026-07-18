@@ -101,9 +101,14 @@ a {
 .sidebar-close {
   border: none;
   background: transparent;
-  color: #fff;
-  font-size: 1.3rem;
   cursor: pointer;
+  width: 24px;
+  height: 24px;
+  background-image: url('../../image/X_mark.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  padding: 0;
 }
 
 .sidebar-nav {
@@ -156,11 +161,15 @@ a {
 .sidebar-toggle {
   display: none;
   border: none;
-  background: linear-gradient(90deg, rgba(245,185,66,0.2), rgba(76,201,240,0.16));
-  color: var(--accent);
-  padding: 8px 10px;
-  border-radius: 8px;
+  background: transparent;
   cursor: pointer;
+  width: 24px;
+  height: 24px;
+  background-image: url('../../image/hamburger_menu.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  padding: 0;
 }
 
 .topbar h1 {
@@ -280,6 +289,11 @@ a {
   font-weight: 600;
 }
 
+/* Table wrapper for responsive tables */
+.table-wrapper {
+  overflow-x: auto;
+}
+
 /* ===========================
    Status Badge
 =========================== */
@@ -292,7 +306,8 @@ a {
   font-weight: 700;
 }
 
-.status-badge.available {
+.status-badge.available,
+.status-badge.approved {
   background: rgba(110,231,183,0.18);
   color: var(--success);
 }
@@ -305,11 +320,6 @@ a {
 .status-badge.active {
   background: rgba(76,201,240,0.16);
   color: var(--accent-2);
-}
-
-.status-badge.approved {
-  background: rgba(110,231,183,0.18);
-  color: var(--success);
 }
 
 .status-badge.disapproved {
@@ -337,18 +347,24 @@ form {
   gap: 12px;
 }
 
-label {
+.form-group {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  margin-bottom: 12px;
+}
+
+.form-group label {
+  margin-bottom: 6px;
+  color: var(--text);
   font-size: 0.95rem;
   font-weight: 600;
-  color: var(--text);
 }
 
 input,
 select,
-textarea {
+textarea,
+.form-control {
   width: 100%;
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -360,7 +376,8 @@ textarea {
 
 input:focus,
 select:focus,
-textarea:focus {
+textarea:focus,
+.form-control:focus {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(245,185,66,0.16);
@@ -371,7 +388,7 @@ textarea:focus {
 =========================== */
 
 button,
-.topbar-action,
+.action-btn-small,
 .btn-primary {
   display: inline-flex;
   align-items: center;
@@ -387,13 +404,12 @@ button,
 }
 
 button:hover,
-.topbar-action:hover,
+.action-btn-small:hover,
 .btn-primary:hover {
   transform: translateY(-1px);
   box-shadow: 0 8px 18px rgba(0,0,0,0.25);
 }
 
-button.primary,
 .btn-primary,
 .topbar-action {
   background: linear-gradient(90deg, var(--accent), #ffcf66);
@@ -425,18 +441,6 @@ button.primary,
    Action Buttons
 =========================== */
 
-.action-btn-small {
-  display: inline-block;
-  padding: 8px 16px;
-  border-radius: 8px;
-  text-decoration: none;
-  font-size: 13px;
-  font-weight: 600;
-  transition: 0.3s;
-  border: none;
-  cursor: pointer;
-}
-
 .action-btn-small.approve {
   background: var(--success);
   color: #fff;
@@ -463,30 +467,6 @@ button.primary,
 .text-danger {
   color: var(--danger);
   font-weight: 600;
-}
-
-/* ===========================
-   Success/Error Messages
-=========================== */
-
-.success-message {
-  background: rgba(110,231,183,0.16);
-  color: var(--success);
-  padding: 14px;
-  border-radius: 10px;
-  margin-bottom: 20px;
-  text-align: center;
-  font-size: 14px;
-}
-
-.error-message {
-  background: rgba(248,113,113,0.16);
-  color: var(--danger);
-  padding: 14px;
-  border-radius: 10px;
-  margin-bottom: 20px;
-  text-align: center;
-  font-size: 14px;
 }
 
 /* ===========================
@@ -625,18 +605,20 @@ button.primary,
   border-collapse: collapse;
 }
 
-.info-table th {
-  width: 170px;
-  text-align: left;
+.info-table th,
+.info-table td {
   padding: 12px 0;
-  color: var(--text);
   border-bottom: 1px solid var(--border);
 }
 
+.info-table th {
+  width: 170px;
+  text-align: left;
+  color: var(--text);
+}
+
 .info-table td {
-  padding: 12px 0;
   color: var(--muted);
-  border-bottom: 1px solid var(--border);
 }
 
 .vehicle-actions {
@@ -649,10 +631,7 @@ button.primary,
    Animation
 =========================== */
 
-.dashboard-card,
-.stat-box,
-.vehicle-card,
-.hero-card {
+.fade-in {
   animation: fadeIn 0.35s ease;
 }
 
@@ -762,6 +741,35 @@ a:focus {
   .vehicle-card {
     grid-template-columns: 1fr;
   }
+
+  .hero-card,
+  .card,
+  .form-card {
+    padding: 16px;
+  }
+
+  .stat-box {
+    padding: 14px;
+  }
+
+  .vehicle-details h3 {
+    font-size: 20px;
+  }
+
+  .info-table th {
+    width: 130px;
+    font-size: 14px;
+  }
+
+  .info-table td {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 576px) {
+  .sidebar {
+    width: 240px;
+  }
 }
 
 /* ===========================
@@ -811,35 +819,6 @@ a:focus {
   font-size: 15px;
 }
 
-.form-group {
-  margin-bottom: 20px;
-}
-
-.form-group label {
-  display: block;
-  margin-bottom: 8px;
-  color: var(--text);
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.form-control {
-  width: 100%;
-  padding: 14px 16px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: rgba(255,255,255,0.04);
-  color: var(--text);
-  font-size: 15px;
-  transition: border-color 0.3s ease;
-}
-
-.form-control:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(245,185,66,0.16);
-}
-
 .login-btn,
 .register-btn {
   width: 100%;
@@ -883,10 +862,6 @@ a:focus {
   padding-top: 18px;
 }
 
-/* ===========================
-   Responsive
-=========================== */
-
 @media (max-width: 768px) {
   .login-card,
   .register-card {
@@ -914,35 +889,6 @@ a:focus {
   }
 
   .logo p {
-    font-size: 14px;
-  }
-}
-
-@media (max-width: 576px) {
-  .sidebar {
-    width: 240px;
-  }
-
-  .hero-card,
-  .card,
-  .form-card {
-    padding: 16px;
-  }
-
-  .stat-box {
-    padding: 14px;
-  }
-
-  .vehicle-details h3 {
-    font-size: 20px;
-  }
-
-  .info-table th {
-    width: 130px;
-    font-size: 14px;
-  }
-
-  .info-table td {
     font-size: 14px;
   }
 }

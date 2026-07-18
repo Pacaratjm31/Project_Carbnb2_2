@@ -18,7 +18,7 @@
 }
 
 body {
-    background-color: #1e1e1e;
+   background:#1e1e1e;
     color: #cfcfcf;
 }
 
@@ -71,7 +71,7 @@ nav h2 { color: #ffd700; font-size: 28px; }
 .hero {
     height: 55vh; /* slightly reduced for balance */
     margin-top: 20px;
-    background-image: url('Carbnb_logo.png');
+    background-image: url('image/Carbnb_logo.png');
     background-repeat: no-repeat;
     background-position: center;
     background-size: contain;

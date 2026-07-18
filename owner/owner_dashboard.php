@@ -14,6 +14,16 @@ $dashboard = get_dashboard_data($pdo, $owner['id']);
 $stats = $dashboard['stats'];
 $recent_bookings = $dashboard['recent_bookings'];
 $account_state = get_owner_account_state($owner);
+$unread_count = get_unread_message_count($pdo, $owner['id']);
+$recent_messages = get_owner_messages($pdo, $owner['id']);
+// Get only the 3 most recent messages for dashboard display
+$recent_messages = array_slice($recent_messages, 0, 3);
+
+// Get maintenance count for dashboard
+$maintenance_count = 0;
+$stmt = $pdo->prepare("SELECT COUNT(*) FROM vehicles WHERE owner_id = ? AND availability_status = 'maintenance' AND is_deleted = 0");
+$stmt->execute([$owner['id']]);
+$maintenance_count = (int) $stmt->fetchColumn();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -26,9 +36,9 @@ $account_state = get_owner_account_state($owner);
 <body data-user-id="<?php echo (int) $owner['id']; ?>" data-current-status="<?php echo htmlspecialchars($owner['status'] ?? 'pending'); ?>">
   <div class="overlay"></div>
   <aside class="sidebar">
-    <div class="sidebar-header">
+<div class="sidebar-header">
       <h2>Carbnb Owner</h2>
-      <button class="sidebar-close" type="button">×</button>
+      <button class="sidebar-close" type="button" aria-label="Close sidebar"></button>
     </div>
     <nav class="sidebar-nav">
       <a class="active" href="owner_dashboard.php">Dashboard</a>
@@ -58,8 +68,8 @@ $account_state = get_owner_account_state($owner);
   </aside>
 
   <div class="main-content">
-    <header class="topbar">
-      <button class="sidebar-toggle" type="button">☰</button>
+<header class="topbar">
+      <button class="sidebar-toggle" type="button" aria-label="Open sidebar"></button>
       <h1>Owner Dashboard</h1>
       <a class="topbar-action" href="owner_profile.php">Profile</a>
     </header>
@@ -88,7 +98,7 @@ $account_state = get_owner_account_state($owner);
         <p><strong>Note:</strong> <span id="approval-note"><?php echo htmlspecialchars(($owner['disapproval_reason'] ?? '') !== '' ? $owner['disapproval_reason'] : 'No admin note yet.'); ?></span></p>
       </section>
 
-      <section class="stats-grid">
+<section class="stats-grid">
         <div class="stat-box">
           <h3>Active Vehicles</h3>
           <p><?php echo (int) $stats['active_vehicles']; ?></p>
@@ -100,6 +110,10 @@ $account_state = get_owner_account_state($owner);
         <div class="stat-box">
           <h3>Monthly Income</h3>
           <p><?php echo format_currency($stats['monthly_income']); ?></p>
+        </div>
+        <div class="stat-box">
+          <h3>Maintenance</h3>
+          <p><?php echo (int) $maintenance_count; ?></p>
         </div>
       </section>
 
@@ -121,8 +135,21 @@ $account_state = get_owner_account_state($owner);
           <p>Your fleet is synced from the database.</p>
         </div>
         <div class="card">
-          <h3 class="section-title">Messages</h3>
-          <p>Inbox items are loaded from the messages table.</p>
+          <h3 class="section-title">Messages <?php if ($unread_count > 0): ?><span class="status-badge pending" style="margin-left:8px;"><?= $unread_count ?> new</span><?php endif; ?></h3>
+          <?php if (empty($recent_messages)) : ?>
+            <p class="empty-state">No messages yet. <a href="owner_message.php" style="color:var(--accent);">View all messages</a></p>
+          <?php else : ?>
+            <ul style="margin:0; padding-left:18px;">
+              <?php foreach ($recent_messages as $msg): ?>
+                <li style="margin-bottom:8px;">
+                  <strong><?= $msg['sender_id'] == $owner['id'] ? 'To: ' . clean($msg['receiver_name']) : 'From: ' . clean($msg['sender_name']) ?></strong>
+                  <br><span style="color:var(--muted);"><?= clean(substr($msg['message'], 0, 80)) ?><?= strlen($msg['message']) > 80 ? '...' : '' ?></span>
+                  <br><small style="color:var(--muted);"><?= format_date($msg['created_at']) ?></small>
+                </li>
+              <?php endforeach; ?>
+            </ul>
+            <a href="owner_message.php" class="action-btn" style="margin-top:10px; display:inline-block;">View All Messages</a>
+          <?php endif; ?>
         </div>
       </section>
     </main>

@@ -107,9 +107,9 @@ verifyBtn.addEventListener("click", async () => {
 
         const result = await response.json();
 
-        if (result.success) {
+if (result.success) {
             statusMessage.textContent = "Face verified successfully.";
-            const redirectUrl = result.redirect || "/Carbnb_project2/renter/browse.php";
+            const redirectUrl = result.redirect || "../renter/browse.php";
             setTimeout(() => {
                 window.location.href = redirectUrl;
             }, 1000);

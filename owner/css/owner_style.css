@@ -1,3 +1,8 @@
+/* =====================================================
+   Carbnb Owner Panel
+   Redesigned to match Admin Style
+===================================================== */
+
 :root {
   --bg: #0f1115;
   --panel: #171c24;
@@ -25,6 +30,10 @@ body {
   min-height: 100vh;
 }
 
+body.sidebar-open {
+  overflow: hidden;
+}
+
 h1, h2, h3, h4, p, ul, li, a {
   margin-top: 0;
   line-height: 1.5;
@@ -34,9 +43,9 @@ a {
   color: var(--accent-2);
 }
 
-body.sidebar-open {
-  overflow: hidden;
-}
+/* ===========================
+   Overlay
+=========================== */
 
 .overlay {
   position: fixed;
@@ -53,6 +62,10 @@ body.sidebar-open {
   opacity: 1;
   pointer-events: auto;
 }
+
+/* ===========================
+   Sidebar
+=========================== */
 
 .sidebar {
   position: fixed;
@@ -88,9 +101,14 @@ body.sidebar-open {
 .sidebar-close {
   border: none;
   background: transparent;
-  color: #fff;
-  font-size: 1.3rem;
   cursor: pointer;
+  width: 24px;
+  height: 24px;
+  background-image: url('../../image/X_mark.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  padding: 0;
 }
 
 .sidebar-nav {
@@ -114,10 +132,18 @@ body.sidebar-open {
   transform: translateX(2px);
 }
 
+/* ===========================
+   Main Content
+=========================== */
+
 .main-content {
   margin-left: 260px;
   min-height: 100vh;
 }
+
+/* ===========================
+   Topbar
+=========================== */
 
 .topbar {
   display: flex;
@@ -135,11 +161,15 @@ body.sidebar-open {
 .sidebar-toggle {
   display: none;
   border: none;
-  background: linear-gradient(90deg, rgba(245,185,66,0.2), rgba(76,201,240,0.16));
-  color: var(--accent);
-  padding: 8px 10px;
-  border-radius: 8px;
+  background: transparent;
   cursor: pointer;
+  width: 24px;
+  height: 24px;
+  background-image: url('../../image/hamburger_menu.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  padding: 0;
 }
 
 .topbar h1 {
@@ -156,6 +186,10 @@ body.sidebar-open {
   font-size: 0.95rem;
   font-weight: 700;
 }
+
+/* ===========================
+   Page Content
+=========================== */
 
 .page {
   padding: 24px;
@@ -215,6 +249,7 @@ body.sidebar-open {
   margin: 0;
   font-size: 1.35rem;
   font-weight: 700;
+  color: var(--accent);
 }
 
 .section-title {
@@ -233,6 +268,10 @@ body.sidebar-open {
   margin-top: 6px;
 }
 
+/* ===========================
+   Tables
+=========================== */
+
 .table {
   width: 100%;
   border-collapse: collapse;
@@ -249,6 +288,15 @@ body.sidebar-open {
   color: var(--accent);
   font-weight: 600;
 }
+
+/* Table wrapper for responsive tables */
+.table-wrapper {
+  overflow-x: auto;
+}
+
+/* ===========================
+   Status Badge
+=========================== */
 
 .status-badge {
   display: inline-block;
@@ -273,29 +321,44 @@ body.sidebar-open {
   color: var(--accent-2);
 }
 
+.status-badge.disapproved {
+  background: rgba(248,113,113,0.16);
+  color: var(--danger);
+}
+
 .empty-state {
   padding: 12px 0;
   color: var(--muted);
   font-style: italic;
 }
 
+/* ===========================
+   Forms
+=========================== */
+
 form {
   display: grid;
   gap: 12px;
 }
 
-label {
+.form-group {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  margin-bottom: 12px;
+}
+
+.form-group label {
+  margin-bottom: 6px;
+  color: var(--text);
   font-size: 0.95rem;
   font-weight: 600;
-  color: var(--text);
 }
 
 input,
 select,
-textarea {
+textarea,
+.form-control {
   width: 100%;
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -307,14 +370,20 @@ textarea {
 
 input:focus,
 select:focus,
-textarea:focus {
+textarea:focus,
+.form-control:focus {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(245,185,66,0.16);
 }
 
+/* ===========================
+   Buttons
+=========================== */
+
 button,
-.topbar-action,
+.action-btn,
+.action-btn-small,
 .btn-primary {
   display: inline-flex;
   align-items: center;
@@ -330,18 +399,22 @@ button,
 }
 
 button:hover,
-.topbar-action:hover,
+.action-btn:hover,
+.action-btn-small:hover,
 .btn-primary:hover {
   transform: translateY(-1px);
   box-shadow: 0 8px 18px rgba(0,0,0,0.25);
 }
 
-button.primary,
 .btn-primary,
 .topbar-action {
   background: linear-gradient(90deg, var(--accent), #ffcf66);
   color: #111;
 }
+
+/* ===========================
+   Alerts
+=========================== */
 
 .alert {
   padding: 10px 12px;
@@ -363,37 +436,6 @@ button.primary,
 /* ===========================
    Action Buttons
 =========================== */
-
-.action-btn {
-  display: inline-block;
-  padding: 8px 16px;
-  border-radius: 8px;
-  text-decoration: none;
-  font-size: 13px;
-  font-weight: 600;
-  transition: 0.3s;
-  border: none;
-  cursor: pointer;
-  background: linear-gradient(90deg, var(--accent), #ffcf66);
-  color: #111;
-}
-
-.action-btn:hover {
-  background: linear-gradient(90deg, #ffcf66, var(--accent));
-  transform: translateY(-1px);
-}
-
-.action-btn-small {
-  display: inline-block;
-  padding: 8px 16px;
-  border-radius: 8px;
-  text-decoration: none;
-  font-size: 13px;
-  font-weight: 600;
-  transition: 0.3s;
-  border: none;
-  cursor: pointer;
-}
 
 .action-btn-small.approve {
   background: var(--success);
@@ -469,6 +511,20 @@ button.primary,
   margin-bottom: 15px;
   min-height: 100px;
 }
+
+/* ===========================
+   Utilities
+=========================== */
+
+.action-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* ===========================
+   Responsive
+=========================== */
 
 @media (max-width: 900px) {
   .sidebar {

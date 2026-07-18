@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/owner_logic.php';
+include __DIR__ . '/../helpers/duplicate_functions.php';
 $pdo = get_owner_pdo();
 $owner = get_current_owner($pdo);
 
@@ -22,34 +23,125 @@ if (function_exists('enforce_owner_access')) {
 $success = '';
 $error = '';
 
+// Get success message from redirect
+if (isset($_GET['success'])) {
+    $success = trim($_GET['success']);
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['reply'], $_POST['message_id'])) {
-    $messageId = (int)$_POST['message_id'];
-    $reply = trim($_POST['reply']);
-    
-    if (!empty($reply)) {
-        // Get the original message to find the sender (renter)
-        $stmt = $pdo->prepare("SELECT sender_id, receiver_id FROM messages WHERE id = ? AND receiver_id = ?");
-        $stmt->execute([$messageId, $owner['id']]);
-        $originalMsg = $stmt->fetch();
+    // Validate form token to prevent duplicate submissions
+    $tokenError = validate_form_token_or_error('reply_message');
+    if ($tokenError) {
+        $error = $tokenError;
+    } else {
+        $messageId = (int)$_POST['message_id'];
+        $reply = trim($_POST['reply']);
         
-        if ($originalMsg) {
-            // Insert reply as a new message from owner to renter
-            $stmt = $pdo->prepare("
-                INSERT INTO messages (sender_id, receiver_id, message) 
-                VALUES (?, ?, ?)
-            ");
-            $stmt->execute([$owner['id'], $originalMsg['sender_id'], $reply]);
+        if (!empty($reply)) {
+            // Get the original message to find the sender (renter)
+            $stmt = $pdo->prepare("SELECT sender_id, receiver_id FROM messages WHERE id = ? AND receiver_id = ?");
+            $stmt->execute([$messageId, $owner['id']]);
+            $originalMsg = $stmt->fetch();
             
-            // Mark original message as read
-            $stmt = $pdo->prepare("UPDATE messages SET is_read = 1 WHERE id = ?");
-            $stmt->execute([$messageId]);
-            
-            $success = 'Reply sent successfully!';
+            if ($originalMsg) {
+                // Insert reply as a new message from owner to renter
+                $stmt = $pdo->prepare("
+                    INSERT INTO messages (sender_id, receiver_id, message) 
+                    VALUES (?, ?, ?)
+                ");
+                $stmt->execute([$owner['id'], $originalMsg['sender_id'], $reply]);
+                
+                // Mark original message as read
+                $stmt = $pdo->prepare("UPDATE messages SET is_read = 1 WHERE id = ?");
+                $stmt->execute([$messageId]);
+                
+                header('Location: owner_message.php?success=' . urlencode('Reply sent successfully!'));
+                exit;
+            }
         }
     }
 }
 
+// Handle sending new message to renter
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_new_message'], $_POST['renter_id'], $_POST['new_message'])) {
+    // Validate form token to prevent duplicate submissions
+    $tokenError = validate_form_token_or_error('send_new_message');
+    if ($tokenError) {
+        $error = $tokenError;
+    } else {
+        $renterId = (int)$_POST['renter_id'];
+        $newMessage = trim($_POST['new_message']);
+        
+        if (!empty($newMessage) && $renterId > 0) {
+            $stmt = $pdo->prepare("
+                INSERT INTO messages (sender_id, receiver_id, message) 
+                VALUES (?, ?, ?)
+            ");
+            $stmt->execute([$owner['id'], $renterId, $newMessage]);
+            header('Location: owner_message.php?success=' . urlencode('Message sent successfully!'));
+            exit;
+        }
+    }
+}
+
+// Handle marking message as read
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mark_read'], $_POST['message_id'])) {
+    $messageId = (int)$_POST['message_id'];
+    
+    $stmt = $pdo->prepare("UPDATE messages SET is_read = 1 WHERE id = ? AND receiver_id = ?");
+    $stmt->execute([$messageId, $owner['id']]);
+    header('Location: owner_message.php?success=' . urlencode('Message marked as read!'));
+    exit;
+}
+
 $messages = get_owner_messages($pdo, $owner['id']);
+
+// Get all approved renters for the dropdown (not just those who have messaged)
+$renters = [];
+try {
+    $stmt = $pdo->prepare("
+        SELECT id, full_name, email
+        FROM users
+        WHERE role = 'renter' AND status = 'approved' AND is_deleted = 0
+        ORDER BY full_name
+    ");
+    $stmt->execute();
+    $renters = $stmt->fetchAll();
+} catch (PDOException $e) {
+    $error = $e->getMessage();
+}
+
+// Get all admins for the dropdown
+$admins = [];
+try {
+    $stmt = $pdo->prepare("
+        SELECT id, full_name, email
+        FROM users
+        WHERE role = 'admin' AND is_deleted = 0
+        ORDER BY full_name
+    ");
+    $stmt->execute();
+    $admins = $stmt->fetchAll();
+} catch (PDOException $e) {
+    $error = $e->getMessage();
+}
+
+// Get inspections for this owner's vehicles
+$inspections = [];
+try {
+    $stmt = $pdo->prepare("
+        SELECT i.*, v.name AS vehicle_name, u.full_name AS renter_name
+        FROM inspect i
+        JOIN vehicles v ON v.id = i.vehicle_id
+        JOIN users u ON u.id = i.renter_id
+        WHERE i.owner_id = ?
+        ORDER BY i.created_at DESC
+    ");
+    $stmt->execute([$owner['id']]);
+    $inspections = $stmt->fetchAll();
+} catch (PDOException $e) {
+    $error = $e->getMessage();
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -62,9 +154,9 @@ $messages = get_owner_messages($pdo, $owner['id']);
 <body>
   <div class="overlay"></div>
   <aside class="sidebar">
-    <div class="sidebar-header">
+<div class="sidebar-header">
       <h2>Carbnb Owner</h2>
-      <button class="sidebar-close" type="button">×</button>
+      <button class="sidebar-close" type="button" aria-label="Close sidebar"></button>
     </div>
     <nav class="sidebar-nav">
       <a href="owner_dashboard.php">Dashboard</a>
@@ -82,8 +174,8 @@ $messages = get_owner_messages($pdo, $owner['id']);
   </aside>
 
   <div class="main-content">
-    <header class="topbar">
-      <button class="sidebar-toggle" type="button">☰</button>
+<header class="topbar">
+      <button class="sidebar-toggle" type="button" aria-label="Open sidebar"></button>
       <h1>Messages</h1>
       <a class="topbar-action" href="owner_dashboard.php">Home</a>
     </header>
@@ -97,6 +189,103 @@ $messages = get_owner_messages($pdo, $owner['id']);
         <div class="alert error"><?= clean($error) ?></div>
       <?php endif; ?>
 
+<!-- Car Inspections Section -->
+      <section class="card" style="margin-bottom:20px;">
+        <h3 class="section-title">Car Inspections</h3>
+        
+        <?php if (empty($inspections)): ?>
+          <p class="empty-state">No inspection images submitted yet.</p>
+        <?php else: ?>
+          <div class="table-wrapper">
+            <table class="table">
+              <thead>
+                <tr>
+<th>Renter</th>
+                  <th>Vehicle</th>
+                  <th>Front Car</th>
+                  <th>Back Car</th>
+                  <th>Left Side</th>
+                  <th>Right Side</th>
+                  <th>Reason for Inspection</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                <?php foreach ($inspections as $inspection): ?>
+                  <tr>
+                    <td><?= clean($inspection['renter_name']) ?></td>
+                    <td><?= clean($inspection['vehicle_name']) ?></td>
+                    <td>
+                      <?php if (!empty($inspection['front_image'])): ?>
+                        <a href="../<?= $inspection['front_image'] ?>" target="_blank">
+                          <img src="../<?= $inspection['front_image'] ?>" style="width:50px; height:50px; object-fit:cover; border-radius:4px;">
+                        </a>
+                      <?php else: ?> — <?php endif; ?>
+                    </td>
+                    <td>
+                      <?php if (!empty($inspection['back_image'])): ?>
+                        <a href="../<?= $inspection['back_image'] ?>" target="_blank">
+                          <img src="../<?= $inspection['back_image'] ?>" style="width:50px; height:50px; object-fit:cover; border-radius:4px;">
+                        </a>
+                      <?php else: ?> — <?php endif; ?>
+                    </td>
+                    <td>
+                      <?php if (!empty($inspection['left_image'])): ?>
+                        <a href="../<?= $inspection['left_image'] ?>" target="_blank">
+                          <img src="../<?= $inspection['left_image'] ?>" style="width:50px; height:50px; object-fit:cover; border-radius:4px;">
+                        </a>
+                      <?php else: ?> — <?php endif; ?>
+                    </td>
+                    <td>
+                      <?php if (!empty($inspection['right_image'])): ?>
+                        <a href="../<?= $inspection['right_image'] ?>" target="_blank">
+                          <img src="../<?= $inspection['right_image'] ?>" style="width:50px; height:50px; object-fit:cover; border-radius:4px;">
+                        </a>
+                      <?php else: ?> — <?php endif; ?>
+                    </td>
+                    <td><?= clean($inspection['reason'] ?: 'No reason provided') ?></td>
+                    <td><?= format_date($inspection['created_at']) ?></td>
+                  </tr>
+                <?php endforeach; ?>
+              </tbody>
+            </table>
+          </div>
+        <?php endif; ?>
+      </section>
+
+<!-- Send New Message Section -->
+      <section class="card" style="margin-bottom:20px;">
+        <h3 class="section-title">Send New Message</h3>
+        <form method="POST" id="newMessageForm">
+          <input type="hidden" name="send_new_message" value="1">
+          <?= form_token_input('send_new_message') ?>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+<div class="form-group">
+              <label>Select Recipient</label>
+              <select name="renter_id" class="form-control" required>
+                <option value="">-- Select Recipient --</option>
+                <optgroup label="Renters">
+                  <?php foreach ($renters as $renter): ?>
+                    <option value="<?= $renter['id'] ?>"><?= clean($renter['full_name']) ?> (Renter)</option>
+                  <?php endforeach; ?>
+                </optgroup>
+                <optgroup label="Admins">
+                  <?php foreach ($admins as $admin): ?>
+                    <option value="<?= $admin['id'] ?>"><?= clean($admin['full_name']) ?> (Admin)</option>
+                  <?php endforeach; ?>
+                </optgroup>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Message</label>
+              <textarea name="new_message" rows="3" class="form-control" placeholder="Type your message..." required></textarea>
+            </div>
+          </div>
+          <button type="submit" class="action-btn-small approve" style="margin-top:10px;">Send Message</button>
+        </form>
+      </section>
+
+      <!-- Inbox Section -->
       <section class="card">
         <h3 class="section-title">Inbox</h3>
         
@@ -114,10 +303,16 @@ $messages = get_owner_messages($pdo, $owner['id']);
                   <th>Action</th>
                 </tr>
               </thead>
-              <tbody>
+<tbody>
                 <?php foreach ($messages as $msg): ?>
                   <tr>
-                    <td><?= clean($msg['sender_name'] ?: 'System') ?></td>
+                    <td>
+                      <?php if ($msg['sender_id'] == $owner['id']): ?>
+                        To: <?= clean($msg['receiver_name']) ?>
+                      <?php else: ?>
+                        From: <?= clean($msg['sender_name']) ?>
+                      <?php endif; ?>
+                    </td>
                     <td><?= clean(substr($msg['message'], 0, 100)) ?><?= strlen($msg['message']) > 100 ? '...' : '' ?></td>
                     <td>
                       <span class="status-badge <?= $msg['is_read'] ? 'available' : 'pending' ?>">
@@ -126,7 +321,16 @@ $messages = get_owner_messages($pdo, $owner['id']);
                     </td>
                     <td><?= format_date($msg['created_at']) ?></td>
                     <td>
-                      <button class="action-btn" onclick="openReplyModal(<?= $msg['id'] ?>, <?= json_encode($msg['message']) ?>)">Reply</button>
+<?php if ($msg['sender_id'] != $owner['id'] && !$msg['is_read']): ?>
+                        <form method="POST" style="display:inline; margin-right: 5px;">
+                          <input type="hidden" name="mark_read" value="1">
+                          <input type="hidden" name="message_id" value="<?= $msg['id'] ?>">
+                          <button type="submit" class="action-btn-small approve" onclick="return confirm('Mark this message as read?')">Read</button>
+                        </form>
+                      <?php endif; ?>
+<?php if ($msg['sender_id'] != $owner['id']): ?>
+                        <button type="button" class="action-btn reply-btn" data-id="<?= $msg['id'] ?>" data-message="<?= htmlspecialchars(json_encode($msg['message']), ENT_QUOTES, 'UTF-8') ?>">Reply</button>
+                      <?php endif; ?>
                     </td>
                   </tr>
                 <?php endforeach; ?>
@@ -139,7 +343,7 @@ $messages = get_owner_messages($pdo, $owner['id']);
   </div>
 
   <!-- Reply Modal -->
-  <div id="replyModal" class="modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:2000; align-items:center; justify-content:center;">
+  <div id="replyModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:2000; align-items:center; justify-content:center;">
     <div class="card" style="max-width:500px; width:90%; padding:20px; background:#2a2a2a; border-radius:12px;">
       <h3 style="margin-bottom:15px; color:#ffd700;">Reply to Message</h3>
       <form method="POST">
@@ -162,19 +366,48 @@ $messages = get_owner_messages($pdo, $owner['id']);
 
   <script>
     function openReplyModal(id, message) {
-      document.getElementById('messageId').value = id;
-      document.getElementById('originalMessage').textContent = message;
-      document.getElementById('replyText').value = '';
-      document.getElementById('replyModal').style.display = 'flex';
+      var modal = document.getElementById('replyModal');
+      var messageId = document.getElementById('messageId');
+      var originalMessage = document.getElementById('originalMessage');
+      var replyText = document.getElementById('replyText');
+      
+      if (modal && messageId && originalMessage && replyText) {
+        messageId.value = id;
+        originalMessage.textContent = message;
+        replyText.value = '';
+        modal.style.display = 'flex';
+      } else {
+        console.error('Modal elements not found');
+      }
     }
 
     function closeReplyModal() {
-      document.getElementById('replyModal').style.display = 'none';
+      var modal = document.getElementById('replyModal');
+      if (modal) {
+        modal.style.display = 'none';
+      }
     }
 
-    // Close modal on outside click
-    document.getElementById('replyModal').addEventListener('click', function(e) {
-      if (e.target === this) closeReplyModal();
+    document.addEventListener('DOMContentLoaded', function() {
+      var modal = document.getElementById('replyModal');
+      
+      if (modal) {
+        // Close modal on outside click
+        modal.addEventListener('click', function(e) {
+          if (e.target === this) closeReplyModal();
+        });
+      }
+      
+      // Handle reply button clicks using data attributes
+      document.querySelectorAll('.reply-btn').forEach(function(button) {
+        button.addEventListener('click', function() {
+          var id = this.getAttribute('data-id');
+          var message = this.getAttribute('data-message');
+          if (id && message) {
+            openReplyModal(id, message);
+          }
+        });
+      });
     });
   </script>
 

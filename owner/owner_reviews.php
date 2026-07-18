@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/owner_logic.php';
+include __DIR__ . '/../helpers/duplicate_functions.php';
 $pdo = get_owner_pdo();
 $owner = get_current_owner($pdo);
 
@@ -22,26 +23,25 @@ if (function_exists('enforce_owner_access')) {
 $success = '';
 $error = '';
 
+// Get success message from redirect
+if (isset($_GET['success'])) {
+    $success = trim($_GET['success']);
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['reply'], $_POST['review_id'])) {
     $reviewId = (int)$_POST['review_id'];
-    $reply = trim($_POST['reply']);
+    $reply = trim($_POST['reply_text'] ?? '');
     
     if (!empty($reply)) {
         try {
-            // Verify the review belongs to this owner
-            $stmt = $pdo->prepare("SELECT r.id, r.renter_id, v.id as vehicle_id FROM reviews r JOIN vehicles v ON v.id = r.vehicle_id WHERE r.id = ? AND v.owner_id = ?");
-            $stmt->execute([$reviewId, $owner['id']]);
-            $review = $stmt->fetch();
+            // Update the reply field in the reviews table (works for both with and without vehicle)
+            $stmt = $pdo->prepare("UPDATE reviews SET reply = ? WHERE id = ? AND owner_id = ?");
+            $stmt->execute([$reply, $reviewId, $owner['id']]);
             
-            if ($review) {
-                // Insert reply as a new message from owner to renter
-                $stmt = $pdo->prepare("
-                    INSERT INTO messages (sender_id, receiver_id, message) 
-                    VALUES (?, ?, ?)
-                ");
-                $stmt->execute([$owner['id'], $review['renter_id'], $reply]);
-                
-                $success = 'Reply sent successfully!';
+            if ($stmt->rowCount() > 0) {
+                // Redirect to prevent duplicate submission on refresh
+                header('Location: owner_reviews.php?success=' . urlencode('Reply sent successfully!'));
+                exit;
             } else {
                 $error = 'Invalid review.';
             }
@@ -86,8 +86,8 @@ $reviews = get_owner_reviews($pdo, $owner['id']);
   </aside>
 
   <div class="main-content">
-    <header class="topbar">
-      <button class="sidebar-toggle" type="button">☰</button>
+<header class="topbar">
+      <button class="sidebar-toggle" type="button" aria-label="Open sidebar"></button>
       <h1>Reviews & Feedback</h1>
       <a class="topbar-action" href="owner_dashboard.php">Home</a>
     </header>
@@ -106,15 +106,17 @@ $reviews = get_owner_reviews($pdo, $owner['id']);
         
         <?php if (empty($reviews)) : ?>
           <p class="empty-state">No reviews yet. Reviews from renters will appear here after they complete their bookings.</p>
-        <?php else : ?>
-          <div class="table-wrapper">
-            <table class="table">
-              <thead>
+<?php else : ?>
+<div class="table-wrapper">
+             <table class="table">
+<thead>
                 <tr>
                   <th>Renter</th>
                   <th>Vehicle</th>
                   <th>Rating</th>
                   <th>Comment</th>
+                  <th>Feedback</th>
+                  <th>Reply</th>
                   <th>Date</th>
                   <th>Action</th>
                 </tr>
@@ -123,17 +125,23 @@ $reviews = get_owner_reviews($pdo, $owner['id']);
                 <?php foreach ($reviews as $review): ?>
                   <tr>
                     <td><?= clean($review['renter_name']) ?></td>
-                    <td><?= clean($review['vehicle_name']) ?></td>
+                    <td><?= clean($review['vehicle_name'] ?: 'General Feedback') ?></td>
                     <td>
-                      <?php for ($i = 1; $i <= 5; $i++): ?>
-                        <?= $i <= $review['rating'] ? '★' : '☆' ?>
-                      <?php endfor; ?>
-                      (<?= $review['rating'] ?>/5)
+                      <?php if ($review['rating']): ?>
+                        <?php for ($i = 1; $i <= 5; $i++): ?>
+                          <?= $i <= $review['rating'] ? '★' : '☆' ?>
+                        <?php endfor; ?>
+                        (<?= $review['rating'] ?>/5)
+                      <?php else: ?>
+                        <em>No rating</em>
+                      <?php endif; ?>
                     </td>
                     <td><?= clean($review['comment'] ?: 'No comment') ?></td>
+                    <td><?= clean($review['feedback'] ?: 'No feedback') ?></td>
+                    <td><?= clean($review['reply'] ?: 'No reply yet') ?></td>
                     <td><?= format_date($review['created_at']) ?></td>
                     <td>
-                      <button class="action-btn" onclick="openReplyModal(<?= $review['id'] ?>, <?= json_encode($review['renter_name']) ?>, <?= json_encode($review['comment']) ?>)">Reply</button>
+                      <button class="action-btn" onclick="openReplyModal(<?= $review['id'] ?>, <?= htmlspecialchars(json_encode($review['renter_name']), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($review['comment'] ?? $review['feedback'] ?? ''), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($review['reply'] ?? ''), ENT_QUOTES) ?>)">Reply</button>
                     </td>
                   </tr>
                 <?php endforeach; ?>
@@ -145,37 +153,45 @@ $reviews = get_owner_reviews($pdo, $owner['id']);
     </main>
   </div>
 
-  <!-- Reply Modal -->
-  <div id="replyModal" class="modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:2000; align-items:center; justify-content:center;">
-    <div class="card" style="max-width:500px; width:90%; padding:20px; background:#2a2a2a; border-radius:12px;">
-      <h3 style="margin-bottom:15px; color:#ffd700;">Reply to Review</h3>
-      <form method="POST">
-        <input type="hidden" name="review_id" id="reviewId">
-        <div class="form-group" style="margin-bottom:15px;">
-          <label style="color:#aaa;">Renter: <span id="renterName" style="color:#cfcfcf;"></span></label>
-        </div>
-        <div class="form-group" style="margin-bottom:15px;">
-          <label style="color:#aaa;">Original Review</label>
-          <p id="originalReview" style="background:#1e1e1e; padding:10px; border-radius:6px; margin-bottom:10px; color:#cfcfcf;"></p>
-        </div>
-        <div class="form-group" style="margin-bottom:15px;">
-          <label style="color:#aaa;">Your Reply</label>
-          <textarea name="reply" id="replyText" rows="4" style="width:100%; padding:10px; border-radius:6px; border:1px solid #555; background:#1e1e1e; color:#cfcfcf;" required></textarea>
-        </div>
-        <div style="display:flex; gap:10px;">
-          <button type="submit" class="primary" style="flex:1;">Send Reply</button>
-          <button type="button" onclick="closeReplyModal()" class="action-btn" style="flex:1;">Cancel</button>
-        </div>
-      </form>
+<!-- Reply Modal -->
+  <div id="replyModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:2000; align-items:center; justify-content:center;">
+    <div style="display:flex; align-items:center; justify-content:center; height:100%; padding:20px;">
+      <div style="background:#2a2a2a; border-radius:12px; max-width:500px; width:100%; padding:20px;">
+        <h3 style="margin-bottom:15px; color:#ffd700;">Reply to Review</h3>
+<form method="POST" id="replyReviewForm">
+          <input type="hidden" name="reply" value="1">
+          <input type="hidden" name="review_id" id="reviewId">
+          <input type="hidden" name="form_token" id="replyFormToken">
+          <div style="margin-bottom:15px;">
+            <label style="color:#aaa; display:block; margin-bottom:5px;">Renter: <span id="renterName" style="color:#cfcfcf;"></span></label>
+          </div>
+          <div style="margin-bottom:15px;">
+            <label style="color:#aaa; display:block; margin-bottom:5px;">Original Review</label>
+            <p id="originalReview" style="background:#1e1e1e; padding:10px; border-radius:6px; margin-bottom:10px; color:#cfcfcf; min-height:40px;"></p>
+          </div>
+          <div style="margin-bottom:15px;">
+            <label style="color:#aaa; display:block; margin-bottom:5px;">Your Reply</label>
+            <textarea name="reply_text" id="replyText" rows="4" style="width:100%; padding:10px; border-radius:6px; border:1px solid #555; background:#1e1e1e; color:#cfcfcf; box-sizing:border-box;" required></textarea>
+          </div>
+          <div style="display:flex; gap:10px;">
+            <button type="submit" style="flex:1; background:#ffd700; color:#111; border:none; padding:10px; border-radius:6px; cursor:pointer;">Send Reply</button>
+            <button type="button" onclick="closeReplyModal()" style="flex:1; background:#444; color:#fff; border:none; padding:10px; border-radius:6px; cursor:pointer;">Cancel</button>
+          </div>
+        </form>
+      </div>
     </div>
   </div>
 
-  <script>
-    function openReplyModal(reviewId, renterName, reviewComment) {
+<script>
+    // Generate form token for reply form
+    const replyFormToken = '<?= generate_form_token('reply_review') ?>';
+
+    function openReplyModal(reviewId, renterName, reviewComment, existingReply) {
       document.getElementById('reviewId').value = reviewId;
       document.getElementById('renterName').textContent = renterName;
       document.getElementById('originalReview').textContent = reviewComment || 'No comment';
-      document.getElementById('replyText').value = '';
+      document.getElementById('replyText').value = existingReply || '';
+      document.getElementById('replyFormToken').value = replyFormToken;
       document.getElementById('replyModal').style.display = 'flex';
     }
 

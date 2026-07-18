@@ -30,9 +30,9 @@ $history = get_owner_history($pdo, $owner['id']);
 <body>
   <div class="overlay"></div>
   <aside class="sidebar">
-    <div class="sidebar-header">
+<div class="sidebar-header">
       <h2>Carbnb Owner</h2>
-      <button class="sidebar-close" type="button">×</button>
+      <button class="sidebar-close" type="button" aria-label="Close sidebar"></button>
     </div>
     <nav class="sidebar-nav">
       <a href="owner_dashboard.php">Dashboard</a>
@@ -50,17 +50,17 @@ $history = get_owner_history($pdo, $owner['id']);
   </aside>
 
   <div class="main-content">
-    <header class="topbar">
-      <button class="sidebar-toggle" type="button">☰</button>
+<header class="topbar">
+      <button class="sidebar-toggle" type="button" aria-label="Open sidebar"></button>
       <h1>Rental History</h1>
       <a class="topbar-action" href="owner_profile.php">Profile</a>
     </header>
 
     <main class="page">
       <section class="card">
-        <h3 class="section-title">Completed Rentals</h3>
+        <h3 class="section-title">All Bookings</h3>
         <?php if (empty($history)) : ?>
-          <p class="empty-state">No completed rentals yet.</p>
+          <p class="empty-state">No booking history found.</p>
         <?php else : ?>
           <table class="table">
             <thead>
@@ -79,7 +79,7 @@ $history = get_owner_history($pdo, $owner['id']);
                   <td><?php echo htmlspecialchars($item['renter_name']); ?></td>
                   <td><?php echo format_date($item['start_date']); ?> - <?php echo format_date($item['end_date']); ?></td>
                   <td><?php echo format_currency($item['total_price']); ?></td>
-                  <td><span class="status-badge available">Completed</span></td>
+                  <td><span class="status-badge <?php echo htmlspecialchars(status_badge_class($item['status'])); ?>"><?php echo htmlspecialchars(status_label($item['status'])); ?></span></td>
                 </tr>
               <?php endforeach; ?>
             </tbody>

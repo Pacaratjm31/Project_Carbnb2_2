@@ -1,6 +1,9 @@
 <?php
 include '../database/db.php';
-session_start();
+include __DIR__ . '/../helpers/duplicate_functions.php';
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 $conn = $conn ?? $GLOBALS['conn'] ?? $GLOBALS['pdo'] ?? null;
 
 if (!isset($_SESSION['user_id'])) {
@@ -58,72 +61,74 @@ if (($renter['status'] ?? 'pending') !== 'approved') {
 }
 
 $msg = '';
-$reviewMsg = '';
+$returnMsg = '';
 
-// Handle general feedback submission
+// Get success message from redirect
+if (isset($_GET['success'])) {
+    $msg = trim($_GET['success']);
+}
+
+// Handle return car request
+// NOTE: return_car() (in helpers/duplicate_functions.php) only updates
+// bookings.status to 'return_requested' and notifies the owner.
+// It does NOT and must NOT change vehicles.availability_status.
+// Only the owner, via manage_vehicles.php -> make_vehicle_available(),
+// is allowed to set a vehicle back to 'available'.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['return_car'], $_POST['booking_id'])) {
+    // Validate form token to prevent duplicate submissions
+    $tokenError = validate_form_token_or_error('return_car');
+    if ($tokenError) {
+        $returnMsg = $tokenError;
+    } else {
+        $booking_id = (int) $_POST['booking_id'];
+        $result = return_car($conn, $user_id, $booking_id);
+        if ($result['success']) {
+            header('Location: record.php?success=' . urlencode($result['message']));
+            exit;
+        } else {
+            $returnMsg = $result['message'];
+        }
+    }
+}
+
+// Handle general feedback submission to owner
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_feedback'])) {
-    $feedback = trim($_POST['feedback'] ?? '');
-
-    if (!empty($feedback)) {
-        try {
-            $adminStmt = $conn->prepare("SELECT id FROM users WHERE role = 'admin' AND is_deleted = 0 ORDER BY id ASC LIMIT 1");
-            $adminStmt->execute();
-            $admin = $adminStmt->fetch(PDO::FETCH_ASSOC);
-
-            if ($admin) {
-                $stmt = $conn->prepare("INSERT INTO messages (sender_id, receiver_id, message) VALUES (?, ?, ?)");
-                $stmt->execute([$user_id, (int) $admin['id'], $feedback]);
-            } else {
-                $stmt = $conn->prepare("INSERT INTO notifications (user_id, title, message) VALUES (?, ?, ?)");
-                $stmt->execute([$user_id, 'Feedback Submitted', $feedback]);
-            }
-
-            $msg = 'Feedback sent successfully!';
-        } catch (PDOException $e) {
-            $msg = 'Error sending feedback.';
-        }
+    // Validate form token to prevent duplicate submissions
+    $tokenError = validate_form_token_or_error('send_feedback');
+    if ($tokenError) {
+        $msg = $tokenError;
     } else {
-        $msg = 'Please write feedback before submitting.';
-    }
-}
+        $feedback = trim($_POST['feedback'] ?? '');
+        $selected_owner_id = (int)($_POST['owner_id'] ?? 0);
 
-// Handle review submission
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_review'])) {
-    $booking_id = (int)($_POST['booking_id'] ?? 0);
-    $rating = (int)($_POST['rating'] ?? 0);
-    $comment = trim($_POST['comment'] ?? '');
+        if (!empty($feedback) && $selected_owner_id > 0) {
+            try {
+                // Verify the owner exists
+                $ownerStmt = $conn->prepare("SELECT id FROM users WHERE id = ? AND role = 'owner' AND is_deleted = 0");
+                $ownerStmt->execute([$selected_owner_id]);
+                $owner = $ownerStmt->fetch(PDO::FETCH_ASSOC);
 
-    if ($booking_id > 0 && $rating >= 1 && $rating <= 5) {
-        try {
-            // Get the vehicle and owner for this booking
-            $stmt = $conn->prepare("SELECT b.vehicle_id, v.owner_id FROM bookings b JOIN vehicles v ON v.id = b.vehicle_id WHERE b.id = ? AND b.renter_id = ? AND b.status = 'completed'");
-            $stmt->execute([$booking_id, $user_id]);
-            $booking = $stmt->fetch(PDO::FETCH_ASSOC);
-
-            if ($booking) {
-                // Check if review already exists for this booking
-                $stmt = $conn->prepare("SELECT id FROM reviews WHERE renter_id = ? AND vehicle_id = ?");
-                $stmt->execute([$user_id, $booking['vehicle_id']]);
-                
-                if (!$stmt->fetch()) {
-                    // Insert the review
-                    $stmt = $conn->prepare("INSERT INTO reviews (renter_id, owner_id, vehicle_id, rating, comment) VALUES (?, ?, ?, ?, ?)");
-                    $stmt->execute([$user_id, $booking['owner_id'], $booking['vehicle_id'], $rating, $comment]);
+                if ($owner) {
+                    // Insert feedback as a review with NULL vehicle_id (general feedback)
+                    $stmt = $conn->prepare("INSERT INTO reviews (renter_id, owner_id, vehicle_id, rating, feedback) VALUES (?, ?, NULL, NULL, ?)");
+                    $stmt->execute([$user_id, $selected_owner_id, $feedback]);
                     
-                    $reviewMsg = 'Review submitted successfully!';
+                    // Redirect to prevent duplicate submission on refresh
+                    header('Location: record.php?success=' . urlencode('Feedback sent successfully!'));
+                    exit;
                 } else {
-                    $reviewMsg = 'You have already reviewed this vehicle.';
+                    $msg = 'Invalid owner selected.';
                 }
-            } else {
-                $reviewMsg = 'Invalid booking or booking not completed yet.';
+            } catch (PDOException $e) {
+                $msg = 'Error sending feedback.';
             }
-        } catch (PDOException $e) {
-            $reviewMsg = 'Error submitting review.';
+        } else {
+            $msg = 'Please write feedback and select an owner.';
         }
-    } else {
-        $reviewMsg = 'Please select a rating and provide a valid booking.';
     }
 }
+
+// Handle review submission removed - feature not working
 
 $stmt = $conn->prepare("SELECT b.id, b.start_date, b.end_date, b.total_price, b.status, v.name AS vehicle_name, v.owner_id FROM bookings b JOIN vehicles v ON b.vehicle_id = v.id WHERE b.renter_id = ? ORDER BY b.created_at DESC");
 $stmt->execute([$user_id]);
@@ -133,21 +138,37 @@ $stmt = $conn->prepare("SELECT p.id, p.amount, p.proof_image AS receipt_image, p
 $stmt->execute([$user_id]);
 $payments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Get completed bookings that haven't been reviewed yet
+// Get completed bookings that haven't been reviewed yet (kept for future use)
+// $reviewableBookings removed - rate and comment feature not working
+
+// Get all owners for feedback dropdown
 $stmt = $conn->prepare("
-    SELECT b.id, b.vehicle_id, v.name AS vehicle_name, v.owner_id, u.full_name AS owner_name 
-    FROM bookings b 
-    JOIN vehicles v ON v.id = b.vehicle_id 
-    JOIN users u ON u.id = v.owner_id 
-    WHERE b.renter_id = ? AND b.status = 'completed' 
-    AND NOT EXISTS (
-        SELECT 1 FROM reviews r 
-        WHERE r.renter_id = ? AND r.vehicle_id = b.vehicle_id
-    )
-    ORDER BY b.created_at DESC
+    SELECT id AS owner_id, full_name AS owner_name
+    FROM users 
+    WHERE role = 'owner' AND is_deleted = 0
+    ORDER BY full_name ASC
 ");
-$stmt->execute([$user_id, $user_id]);
-$reviewableBookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$stmt->execute();
+$ownersForFeedback = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Get renter's submitted reviews (for both vehicle reviews and general feedback)
+$stmt = $conn->prepare("
+    SELECT r.id, r.rating, r.feedback, r.reply, r.created_at, u.full_name AS owner_name, v.name AS vehicle_name
+    FROM reviews r
+    JOIN users u ON u.id = r.owner_id
+    LEFT JOIN vehicles v ON v.id = r.vehicle_id
+    WHERE r.renter_id = ?
+    ORDER BY r.created_at DESC
+");
+$stmt->execute([$user_id]);
+$myReviews = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Display-only helper for booking status labels (handles multi-word
+// statuses like 'return_requested' -> "Return requested").
+// This is purely cosmetic and does not affect any booking/vehicle logic.
+function booking_status_label(string $status): string {
+    return ucfirst(str_replace('_', ' ', $status));
+}
 ?>
 
 <!DOCTYPE html>
@@ -156,10 +177,29 @@ $reviewableBookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>My Records | Carbnb</title>
-<link rel="stylesheet" href="css/renter_style.css?v=2">
+<link rel="stylesheet" href="../bootstrap-5.3.8-dist/css/bootstrap.min.css">
+        <link rel="stylesheet" href="css/renter_style.css?v=5">
+        <link rel="stylesheet" href="css/renter_style_backup.css?v=4">
 </head>
 
 <body>
+
+<div class="top-nav">
+    <div class="nav-left">
+        <h2>Carbnb</h2>
+    </div>
+    <div class="nav-right">
+        <a href="browse.php" class="nav-all-cars">All Cars</a>
+        <a href="record.php" class="nav-my-records active">My Records</a>
+        <a href="view_profile.php" class="nav-my-profile">My Profile</a>
+        <a href="renter_messages.php" class="nav-my-messages">Messages</a>
+        <a href="../auth/logout.php" class="logout-link">Logout</a>
+    </div>
+</div>
+
+<div class="header-text">
+    <h1><span class="blue">My</span> <span class="orange">Records</span></h1>
+</div>
 
 <div class="record-container">
 
@@ -168,7 +208,11 @@ $reviewableBookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
         <a href="browse.php" class="back-link">← Back to Browse</a>
     </div>
 
-    <h3>Booking History</h3>
+<h3>Booking History</h3>
+
+    <?php if ($returnMsg): ?>
+        <p class="error-msg" style="color:#dc3545;"><?= htmlspecialchars($returnMsg) ?></p>
+    <?php endif; ?>
 
     <?php if (empty($bookings)): ?>
         <p>No rental history found.</p>
@@ -182,8 +226,31 @@ $reviewableBookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 </div>
 
                 <span class="status status-<?= strtolower($b['status']) ?>">
-                    <?= ucfirst($b['status']) ?>
+                    <?= htmlspecialchars(booking_status_label($b['status'])) ?>
                 </span>
+
+                <?php if ($b['status'] === 'approved'): ?>
+                    <form method="POST" style="display:inline; margin-left:10px;" onsubmit="return confirm('Confirm that you have returned this car?');">
+                        <?= form_token_input('return_car') ?>
+                        <input type="hidden" name="booking_id" value="<?= (int) $b['id'] ?>">
+                        <button type="submit" name="return_car" class="btn-small">Return Car</button>
+                    </form>
+<?php elseif ($b['status'] === 'return_requested'): ?>
+                    <span class="text-muted" style="margin-left:10px; font-size:0.9em;">
+                        Waiting for owner to inspect and mark vehicle available.
+                    </span>
+                    <?php
+                    // Check if this vehicle has been reviewed
+                    $stmt = $conn->prepare("SELECT id FROM reviews WHERE renter_id = ? AND vehicle_id = ? LIMIT 1");
+                    $stmt->execute([$user_id, $b['vehicle_id'] ?? 0]);
+                    $hasReviewed = (bool) $stmt->fetch();
+                    ?>
+                    <?php if (!$hasReviewed): ?>
+                    <a href="commet_rate.php?vehicle_id=<?= (int) $b['vehicle_id'] ?>" class="btn-small" style="margin-left:10px; background:#17a2b8; text-decoration:none;">
+                        Rate & Comment
+                    </a>
+                    <?php endif; ?>
+                <?php endif; ?>
             </div>
         <?php endforeach; ?>
     <?php endif; ?>
@@ -211,56 +278,70 @@ $reviewableBookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
         <?php endforeach; ?>
     <?php endif; ?>
 
-    <?php if (!empty($reviewableBookings)): ?>
-    <div class="feedback-box">
-        <h3>Rate Your Experience</h3>
-        
-        <?php if ($reviewMsg): ?>
-            <p class="success-msg"><?= $reviewMsg ?></p>
-        <?php endif; ?>
-        
-        <form method="POST">
-            <input type="hidden" name="submit_review" value="1">
-            <div class="form-group">
-                <label for="booking_id">Select Completed Booking:</label>
-                <select name="booking_id" id="booking_id" required>
-                    <option value="">-- Select a booking --</option>
-                    <?php foreach ($reviewableBookings as $rb): ?>
-                        <option value="<?= $rb['id'] ?>"><?= htmlspecialchars($rb['vehicle_name']) ?> (with <?= htmlspecialchars($rb['owner_name']) ?>)</option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Rating:</label>
-                <div class="star-rating" style="margin-bottom:10px;">
-                    <?php for ($i = 5; $i >= 1; $i--): ?>
-                        <input type="radio" name="rating" id="star<?= $i ?>" value="<?= $i ?>" required>
-                        <label for="star<?= $i ?>" style="color:#ffd700; font-size:1.5rem; cursor:pointer;">★</label>
-                    <?php endfor; ?>
-                </div>
-            </div>
-            <div class="form-group">
-                <label for="comment">Comment (optional):</label>
-                <textarea name="comment" id="comment" placeholder="Share your experience with this vehicle and owner..."></textarea>
-            </div>
-            <button type="submit">Submit Review</button>
-        </form>
-    </div>
-    <?php endif; ?>
+    <!-- Rate Your Experience section removed - feature not working -->
 
+<?php if (!empty($ownersForFeedback)): ?>
     <div class="feedback-box">
-        <h3>Send Feedback to Admin</h3>
+        <h3>Send Feedback to Owner</h3>
 
         <?php if ($msg): ?>
             <p class="success-msg"><?= $msg ?></p>
         <?php endif; ?>
 
-        <form method="POST">
+<form method="POST">
+            <?= form_token_input('send_feedback') ?>
             <input type="hidden" name="send_feedback" value="1">
-            <textarea name="feedback" placeholder="How was your experience with Carbnb?" required></textarea>
+            <div class="form-group">
+                <label for="owner_id">Select Owner:</label>
+                <select name="owner_id" id="owner_id" required>
+                    <option value="">-- Select an owner --</option>
+                    <?php foreach ($ownersForFeedback as $of): ?>
+                        <option value="<?= $of['owner_id'] ?>"><?= htmlspecialchars($of['owner_name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <textarea name="feedback" placeholder="Share your feedback with the owner..." required></textarea>
             <button type="submit">Submit Feedback</button>
         </form>
     </div>
+    <?php else: ?>
+    <div class="feedback-box">
+        <h3>Send Feedback to Owner</h3>
+        <p class="text-muted">You can send feedback to owners after completing a booking.</p>
+    </div>
+    <?php endif; ?>
+
+    <?php if (!empty($myReviews)): ?>
+    <h3>My Reviews & Feedback</h3>
+    
+    <?php foreach ($myReviews as $review): ?>
+    <div class="record-card">
+        <div class="record-info">
+            <p><strong>Owner:</strong> <?= htmlspecialchars($review['owner_name']) ?></p>
+            <?php if (!empty($review['vehicle_name'])): ?>
+                <p><strong>Vehicle:</strong> <?= htmlspecialchars($review['vehicle_name']) ?></p>
+            <?php else: ?>
+                <p><strong>Type:</strong> General Feedback</p>
+            <?php endif; ?>
+            <?php if (!empty($review['rating'])): ?>
+                <p><strong>Rating:</strong> 
+                    <?php for ($i = 1; $i <= 5; $i++): ?>
+                        <?= $i <= $review['rating'] ? '★' : '☆' ?>
+                    <?php endfor; ?>
+                    (<?= $review['rating'] ?>/5)
+                </p>
+            <?php endif; ?>
+<?php if (!empty($review['feedback'])): ?>
+                <p><strong>My Feedback:</strong> <?= nl2br(htmlspecialchars($review['feedback'])) ?></p>
+            <?php endif; ?>
+            <?php if (!empty($review['reply'])): ?>
+                <p><strong>Owner Reply:</strong> <span style="color:#198754;"><?= nl2br(htmlspecialchars($review['reply'])) ?></span></p>
+            <?php endif; ?>
+            <p><small>Date: <?= date('M d, Y', strtotime($review['created_at'])) ?></small></p>
+        </div>
+    </div>
+    <?php endforeach; ?>
+    <?php endif; ?>
 
 </div>
 

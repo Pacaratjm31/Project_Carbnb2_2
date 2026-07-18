@@ -1,0 +1,23 @@
+/* =====================================================
+   Carbnb Admin Panel
+   Backup styles - Additional overrides and compatibility
+   ===================================================== */
+
+/* Profile-specific style overrides for view_profile.php */
+/* These styles differ from the main admin_style.css and are kept for compatibility */
+
+/* Note: .status-badge styles are now in admin_style.css */
+/* This file only contains overrides that differ from the main styles */
+
+.info-label {
+    color: #888;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.info-value {
+    font-size: 1.2rem;
+    margin-bottom: 20px;
+    color: #eee;
+}

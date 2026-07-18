@@ -1,6 +1,9 @@
 <?php
 include '../database/db.php';
-session_start();
+include __DIR__ . '/../helpers/duplicate_functions.php';
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 $conn = $conn ?? $GLOBALS['conn'] ?? $GLOBALS['pdo'] ?? null;
 
 if (!isset($_SESSION['user_id'])) {
@@ -40,7 +43,8 @@ if (($renter['status'] ?? 'pending') !== 'approved') {
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Booking Restricted | Carbnb</title>
-        <link rel="stylesheet" href="css/renter_style.css?v=2">
+    <link rel="stylesheet" href="css/renter_style.css?v=2">
+    <link rel="stylesheet" href="css/renter_style_backup.css?v=4">
     </head>
     <body>
         <div class="booking-container">
@@ -99,6 +103,12 @@ function build_vehicle_image_path($value): string {
 $imgPath = build_vehicle_image_path($car['car_image'] ?? '');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Validate form token to prevent duplicate submissions
+    $tokenError = validate_form_token_or_error('book_vehicle');
+    if ($tokenError) {
+        die($tokenError);
+    }
+
     $start = trim($_POST['start'] ?? '');
     $end = trim($_POST['end'] ?? '');
 
@@ -119,29 +129,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         die('This vehicle is not available.');
     }
 
-    $check = $conn->prepare("SELECT COUNT(*) FROM bookings WHERE vehicle_id = ? AND status IN ('pending', 'approved') AND (start_date <= ? AND end_date >= ?)");
-    $check->execute([$car_id, $end, $start]);
+    // Use transaction to prevent race condition
+    try {
+        $conn->beginTransaction();
+        
+        $check = $conn->prepare("SELECT COUNT(*) FROM bookings WHERE vehicle_id = ? AND status IN ('pending', 'approved') AND (start_date <= ? AND end_date >= ?)");
+        $check->execute([$car_id, $end, $start]);
 
-    if ($check->fetchColumn() > 0) {
-        die('This car is already booked for the selected dates.');
+        if ($check->fetchColumn() > 0) {
+            $conn->rollBack();
+            die('This car is already booked for the selected dates.');
+        }
+
+        $diff = strtotime($end) - strtotime($start);
+        $days = floor($diff / (60 * 60 * 24)) + 1;
+        $days = max(1, $days);
+
+        $total_price = $days * (float) $car['rate'];
+
+        $stmt = $conn->prepare("INSERT INTO bookings (renter_id, vehicle_id, start_date, end_date, total_days, total_price, status) VALUES (?, ?, ?, ?, ?, ?, 'pending')");
+        $stmt->execute([$user_id, $car_id, $start, $end, $days, $total_price]);
+
+        $booking_id = $conn->lastInsertId();
+
+        $update = $conn->prepare("UPDATE vehicles SET availability_status = 'rented' WHERE id = ?");
+        $update->execute([$car_id]);
+
+        $conn->commit();
+        
+        header('Location: paid.php?booking_id=' . $booking_id);
+        exit;
+    } catch (PDOException $e) {
+        $conn->rollBack();
+        die('Booking failed. Please try again.');
     }
-
-    $diff = strtotime($end) - strtotime($start);
-    $days = floor($diff / (60 * 60 * 24)) + 1;
-    $days = max(1, $days);
-
-    $total_price = $days * (float) $car['rate'];
-
-    $stmt = $conn->prepare("INSERT INTO bookings (renter_id, vehicle_id, start_date, end_date, total_days, total_price, status) VALUES (?, ?, ?, ?, ?, ?, 'pending')");
-    $stmt->execute([$user_id, $car_id, $start, $end, $days, $total_price]);
-
-    $booking_id = $conn->lastInsertId();
-
-    $update = $conn->prepare("UPDATE vehicles SET availability_status = 'rented' WHERE id = ?");
-    $update->execute([$car_id]);
-
-    header('Location: paid.php?booking_id=' . $booking_id);
-    exit;
 }
 ?>
 
@@ -152,6 +173,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Book Car | Carbnb</title>
 <link rel="stylesheet" href="css/renter_style.css?v=2">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 </head>
 
 <body>
@@ -176,13 +198,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     </div>
 
-    <form method="POST" class="booking-form">
+    <form method="POST" class="booking-form" id="bookingForm">
+        <?= form_token_input('book_vehicle') ?>
 
         <label>Start Date</label>
-        <input type="date" name="start" id="start_date" required min="<?= date('Y-m-d') ?>">
+        <input type="text" name="start" id="start_date" required>
 
         <label>End Date</label>
-        <input type="date" name="end" id="end_date" required min="<?= date('Y-m-d') ?>">
+        <input type="text" name="end" id="end_date" required>
 
         <div class="price-box">
             <p>Days: <span id="total-days">0</span></p>
@@ -195,12 +218,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script>
 const startInput = document.getElementById('start_date');
 const endInput = document.getElementById('end_date');
 const daysDisplay = document.getElementById('total-days');
 const priceDisplay = document.getElementById('total-price');
 const rate = parseFloat("<?= $car['rate'] ?>") || 0;
+const today = '<?= date('Y-m-d') ?>';
+
+// Initialize Flatpickr for start date
+const startPicker = flatpickr(startInput, {
+    dateFormat: 'Y-m-d',
+    minDate: today,
+    onChange: function(selectedDates, dateStr) {
+        if (selectedDates[0]) {
+            // Update end date minimum to be same as start date
+            endPicker.set('minDate', dateStr);
+        }
+        updatePrice();
+    }
+});
+
+// Initialize Flatpickr for end date
+const endPicker = flatpickr(endInput, {
+    dateFormat: 'Y-m-d',
+    minDate: today,
+    onChange: updatePrice
+});
 
 function updatePrice() {
     if (startInput.value && endInput.value) {
@@ -222,8 +267,19 @@ function updatePrice() {
     }
 }
 
-startInput.addEventListener('change', updatePrice);
-endInput.addEventListener('change', updatePrice);
+// Prevent double-click on submit button
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('bookingForm');
+    if (form) {
+        form.addEventListener('submit', function() {
+            const submitBtn = this.querySelector('button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Processing...';
+            }
+        });
+    }
+});
 </script>
 
 </body>

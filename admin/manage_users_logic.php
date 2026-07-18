@@ -1,6 +1,7 @@
 <?php
 // Manage Users Logic - User management and approval logic
 require_once 'admin_auth.php';
+include __DIR__ . '/../helpers/duplicate_functions.php';
 
 $users = [];
 
@@ -77,30 +78,48 @@ if (
     $reason = trim($_GET['reason'] ?? '');
 
     if ($action === 'approve') {
+        // Only update if user is currently pending (idempotency check)
         $stmt = $pdo->prepare("
             UPDATE users
             SET status = 'approved', disapproval_reason = NULL
-            WHERE id = ?
+            WHERE id = ? AND status = 'pending'
         ");
         $stmt->execute([$userId]);
-        redirectSuccess(
-            'manage_users.php',
-            'User approved successfully. Account is now verified and has full system access.'
-        );
+        
+        if ($stmt->rowCount() > 0) {
+            redirectSuccess(
+                'manage_users.php',
+                'User approved successfully. Account is now verified and has full system access.'
+            );
+        } else {
+            redirectError(
+                'manage_users.php',
+                'User was already processed or not found.'
+            );
+        }
     }
 
     if ($action === 'reject') {
         $disapprovalReason = $reason !== '' ? $reason : 'No reason provided.';
+        // Only update if user is currently pending (idempotency check)
         $stmt = $pdo->prepare("
             UPDATE users
             SET status = 'disapproved', disapproval_reason = ?
-            WHERE id = ?
+            WHERE id = ? AND status = 'pending'
         ");
         $stmt->execute([$disapprovalReason, $userId]);
-        redirectSuccess(
-            'manage_users.php',
-            'User disapproved successfully. Access has been blocked.'
-        );
+        
+        if ($stmt->rowCount() > 0) {
+            redirectSuccess(
+                'manage_users.php',
+                'User disapproved successfully. Access has been blocked.'
+            );
+        } else {
+            redirectError(
+                'manage_users.php',
+                'User was already processed or not found.'
+            );
+        }
     }
 }
 ?>

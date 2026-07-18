@@ -1,6 +1,9 @@
 <?php
 include '../database/db.php';
-session_start();
+include __DIR__ . '/../helpers/duplicate_functions.php';
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 $conn = $conn ?? $GLOBALS['conn'] ?? $GLOBALS['pdo'] ?? null;
 
 if (!isset($_SESSION['user_id'])) {
@@ -40,6 +43,7 @@ if (($renter['status'] ?? 'pending') !== 'approved') {
         <meta charset="UTF-8">
         <title>Payment Restricted | Carbnb</title>
         <link rel="stylesheet" href="css/renter_style.css?v=2">
+        <link rel="stylesheet" href="css/renter_style_backup.css?v=4">
     </head>
     <body>
         <div class="payment-container">
@@ -71,6 +75,12 @@ if (!$data) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Validate form token to prevent duplicate submissions
+    $tokenError = validate_form_token_or_error('submit_payment');
+    if ($tokenError) {
+        die($tokenError);
+    }
+
     $method = trim($_POST['method'] ?? '');
     $allowedMethods = ['gcash', 'paymaya', 'cash', 'bank_transfer'];
 
@@ -176,6 +186,7 @@ $imagePath = build_vehicle_image_path($data['car_image'] ?? '');
     </div>
 
     <form method="POST" enctype="multipart/form-data" class="payment-form" id="paymentForm">
+        <?= form_token_input('submit_payment') ?>
 
         <label>Payment Method</label>
         <select name="method" required>
@@ -218,7 +229,7 @@ $imagePath = build_vehicle_image_path($data['car_image'] ?? '');
             const result = await response.json();
 
             if (result.success) {
-                window.location.href = 'record.php';
+                window.location.href = 'browse.php';
             } else {
                 alert(result.message || 'Unable to submit payment.');
             }

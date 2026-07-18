@@ -1,6 +1,12 @@
 <?php
 require_once '../database/db.php';
-session_start();
+include __DIR__ . '/../helpers/duplicate_functions.php';
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// Get database connection
+$conn = $GLOBALS['conn'] ?? $GLOBALS['pdo'] ?? null;
 
 header('Content-Type: application/json');
 
@@ -98,7 +104,10 @@ $check = $conn->prepare('SELECT id FROM payments WHERE booking_id = ?');
 $check->execute([$booking_id]);
 
 try {
+    $conn->beginTransaction();
+    
     if ($check->rowCount() > 0) {
+        // Update existing payment
         $stmt = $conn->prepare(
             "UPDATE payments
              SET amount = ?, proof_image = ?, payment_method = ?, transaction_reference = ?, gateway_response = ?, status = 'pending', paid_at = NOW()
@@ -107,6 +116,7 @@ try {
         $stmt->execute([$amount, $file_name, $method, $reference, $gateway_response, $booking_id]);
         $payment_id = $check->fetchColumn();
     } else {
+        // Insert new payment
         $stmt = $conn->prepare(
             "INSERT INTO payments (booking_id, amount, proof_image, payment_method, transaction_reference, gateway_response, status, paid_at)
              VALUES (?, ?, ?, ?, ?, ?, 'pending', NOW())"
@@ -114,14 +124,17 @@ try {
         $stmt->execute([$booking_id, $amount, $file_name, $method, $reference, $gateway_response]);
         $payment_id = (int) $conn->lastInsertId();
     }
+    
+    $conn->commit();
 
     echo json_encode([
         'success' => true,
         'message' => 'Payment submitted successfully. Please wait for admin approval.',
         'payment_id' => $payment_id,
-        'redirect' => 'record.php'
+        'redirect' => 'browse.php'
     ]);
 } catch (PDOException $e) {
+    $conn->rollBack();
     http_response_code(500);
     echo json_encode([
         'success' => false,

@@ -1,6 +1,8 @@
 <?php
 include '../database/db.php';
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 $conn = $conn ?? $GLOBALS['conn'] ?? $GLOBALS['pdo'] ?? null;
 
 if (!isset($_SESSION['user_id'])) {
@@ -140,6 +142,7 @@ function build_vehicle_image_path($value): string {
 <title>Browse Cars | Carbnb</title>
 <link rel="stylesheet" href="../bootstrap-5.3.8-dist/css/bootstrap.min.css">
 <link rel="stylesheet" href="css/renter_style.css?v=4">
+<link rel="stylesheet" href="css/renter_style_backup.css?v=4">
 </head>
 <body data-user-id="<?php echo (int) $user_id; ?>" data-current-status="<?php echo htmlspecialchars($renter['status'] ?? 'pending'); ?>">
 
@@ -173,21 +176,32 @@ function build_vehicle_image_path($value): string {
     <?php endif; ?>
 </div>
 
-<div class="approval-banner <?= $account_state['restricted'] ? 'warning' : 'success' ?>">
-    <div>
-        <strong><?= htmlspecialchars($account_state['title']) ?></strong>
-        <div><?= htmlspecialchars($account_state['message']) ?></div>
+<div class="status-section">
+    <div class="status-banner <?= $account_state['restricted'] ? 'warning' : 'success' ?>">
+        <div class="banner-content">
+            <h3 class="banner-title"><?= htmlspecialchars($account_state['title']) ?></h3>
+            <p class="banner-message"><?= htmlspecialchars($account_state['message']) ?></p>
+        </div>
+        <span id="renter-approval-badge" class="status-badge <?= htmlspecialchars(renter_approval_badge_class($renter['status'] ?? 'pending')) ?>">
+            <?= htmlspecialchars(renter_approval_label($renter['status'] ?? 'pending')) ?>
+        </span>
     </div>
-    <span id="renter-approval-badge" class="status-badge <?= htmlspecialchars(renter_approval_badge_class($renter['status'] ?? 'pending')) ?>">
-        <?= htmlspecialchars(renter_approval_label($renter['status'] ?? 'pending')) ?>
-    </span>
-</div>
 
-<div class="approval-card">
-    <h3>Admin Approval Tracking</h3>
-    <p><strong>Status:</strong> <span id="renter-approval-status" class="status-badge <?= htmlspecialchars(renter_approval_badge_class($renter['status'] ?? 'pending')) ?>"><?= htmlspecialchars(renter_approval_label($renter['status'] ?? 'pending')) ?></span></p>
-    <p><strong>Note:</strong> <span id="renter-approval-note"><?= htmlspecialchars(($renter['disapproval_reason'] ?? '') !== '' ? $renter['disapproval_reason'] : 'No admin note yet.') ?></span></p>
-</div>
+    <div class="status-card">
+        <h3 class="status-card-title">Account Status</h3>
+        <div class="status-grid">
+            <div class="status-item">
+                <span class="status-label">Account Status</span>
+                <span id="renter-approval-status" class="status-badge <?= htmlspecialchars(renter_approval_badge_class($renter['status'] ?? 'pending')) ?>">
+                    <?= htmlspecialchars(renter_approval_label($renter['status'] ?? 'pending')) ?>
+                </span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Admin Note</span>
+                <span id="renter-approval-note" class="status-note"><?= htmlspecialchars(($renter['disapproval_reason'] ?? '') !== '' ? $renter['disapproval_reason'] : 'No admin note yet.') ?></span>
+            </div>
+        </div>
+    </div>
 
 <div class="filter-bar">
     <a href="browse.php">All</a>
@@ -209,22 +223,22 @@ function build_vehicle_image_path($value): string {
 
 <?php foreach ($cars as $car): ?>
 
-    <?php
-        $status = $car['status'] ?? 'available';
-        $approval = $car['approval_status'] ?? 'pending';
-        $imgPath = build_vehicle_image_path($car['car_image'] ?? '');
+<?php
+    $status = $car['status'] ?? 'available';
+    $approval = $car['approval_status'] ?? 'pending';
+    $imgPath = build_vehicle_image_path($car['car_image'] ?? '');
 
-        if ($status === 'available') {
-            $label = 'Available';
-            $class = 'status-available';
-        } elseif ($status === 'rented') {
-            $label = 'In Use';
-            $class = 'status-inuse';
-        } else {
-            $label = 'Maintenance';
-            $class = 'status-maintenance';
-        }
-    ?>
+    if ($status === 'available') {
+        $label = 'Available';
+        $class = 'status-available';
+    } elseif ($status === 'rented') {
+        $label = 'In Use';
+        $class = 'status-inuse';
+    } else {
+        $label = 'Maintenance';
+        $class = 'status-maintenance';
+    }
+?>
 
     <div class="car-card">
 
@@ -255,31 +269,52 @@ function build_vehicle_image_path($value): string {
             <?= $label ?>
         </span>
 
-        <div class="card-actions">
-            <?php if ($account_state['restricted']): ?>
-                <button class="book-btn disabled" disabled>
-                    <?= $account_state['status'] === 'disapproved' ? 'Access Restricted' : 'Approval Pending' ?>
-                </button>
-
-            <?php elseif ($status === 'available' && $approval === 'approved'): ?>
-                <a href="book.php?car_id=<?= (int) $car['id'] ?>" class="book-btn">Book Now</a>
-
-            <?php elseif ($approval === 'disapproved'): ?>
-                <button class="book-btn disabled" disabled>Rejected</button>
-                <p class="rejection-text">
-                    Reason: <?= htmlspecialchars($car['rejection_reason'] ?? 'Contact admin') ?>
-                </p>
-
-            <?php elseif ($approval === 'pending'): ?>
-                <button class="book-btn disabled" disabled>Wait for Approval</button>
-
-            <?php elseif ($status === 'rented'): ?>
-                <button class="book-btn in-use" disabled>In Use</button>
-
-            <?php else: ?>
-                <button class="book-btn disabled" disabled>Unavailable</button>
-            <?php endif; ?>
-        </div>
+<div class="card-actions">
+             <div class="action-buttons">
+                 <a href="vehicle_details.php?car_id=<?= (int) $car['id'] ?>" class="book-btn">View Details</a><br><br>
+                 <a href="commet_rate.php?vehicle_id=<?= (int) $car['id'] ?>" class="book-btn" style="background:#17a2b8;">Comment & Rate</a><br><br>
+                 <?php if ($account_state['restricted']): ?>
+                     <button class="book-btn disabled" disabled>
+                         <?= $account_state['status'] === 'disapproved' ? 'Access Restricted' : 'Approval Pending' ?>
+                     </button>
+                 <?php elseif ($approval === 'approved'): ?>
+                     <?php if ($status === 'available'): ?>
+                         <a href="book.php?car_id=<?= (int) $car['id'] ?>" class="book-btn">Book Now</a><br><br>
+                     <?php endif; ?>
+                     <?php
+// Check if renter has a completed or returned booking for this vehicle
+                      $hasCompletedBooking = false;
+                      $hasReviewed = false;
+                      if (!$account_state['restricted']) {
+                          $stmt = $conn->prepare("SELECT id FROM bookings WHERE renter_id = ? AND vehicle_id = ? AND (status = 'completed' OR status = 'return_requested') LIMIT 1");
+                          $stmt->execute([$user_id, $car['id']]);
+                          $hasCompletedBooking = (bool) $stmt->fetch();
+                          
+                          // Check if already reviewed
+                          $stmt = $conn->prepare("SELECT id FROM reviews WHERE renter_id = ? AND vehicle_id = ? LIMIT 1");
+                          $stmt->execute([$user_id, $car['id']]);
+                          $hasReviewed = (bool) $stmt->fetch();
+                      }
+                     ?>
+                     <?php if ($hasCompletedBooking && !$hasReviewed): ?>
+                         <a href="commet_rate.php?vehicle_id=<?= (int) $car['id'] ?>" class="book-btn" style="background:#17a2b8;">
+                             Rate & Comment
+                         </a><br><br>
+                     <?php elseif ($hasReviewed): ?>
+                         <button class="book-btn disabled" disabled>Review Submitted</button>
+                     <?php endif; ?>
+                 <?php elseif ($approval === 'disapproved'): ?>
+                     <button class="book-btn disabled" disabled>Rejected</button>
+                     <p class="rejection-text">
+                         Reason: <?= htmlspecialchars($car['rejection_reason'] ?? 'Contact admin') ?>
+                     </p>
+                 <?php elseif ($approval === 'pending'): ?>
+                     <button class="book-btn disabled" disabled>Wait for Approval</button>
+                 <?php else: ?>
+                     <button class="book-btn disabled" disabled>Unavailable</button>
+                 <?php endif; ?>
+             </div>
+         </div>
 
     </div>
 
