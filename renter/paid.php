@@ -1,20 +1,28 @@
 <?php
 include '../database/db.php';
 include __DIR__ . '/../helpers/duplicate_functions.php';
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+
 $conn = $conn ?? $GLOBALS['conn'] ?? $GLOBALS['pdo'] ?? null;
 
+// Check login
 if (!isset($_SESSION['user_id'])) {
     header('Location: ../auth/login.php');
     exit;
 }
 
-$user_id = (int) ($_SESSION['user_id'] ?? 0);
+$user_id = (int) $_SESSION['user_id'];
 
 // Get renter account state
-$stmt = $conn->prepare("SELECT id, full_name, status, disapproval_reason FROM users WHERE id = ? AND is_deleted = 0");
+$stmt = $conn->prepare("
+    SELECT id, full_name, status, disapproval_reason
+    FROM users
+    WHERE id = ?
+    AND is_deleted = 0
+");
 $stmt->execute([$user_id]);
 $renter = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -24,49 +32,68 @@ if (!$renter) {
     exit;
 }
 
-// Check if renter is approved
+// Check renter approval
 if (($renter['status'] ?? 'pending') !== 'approved') {
-    $account_state = [
-        'status' => $renter['status'] ?? 'pending',
-        'title' => $renter['status'] === 'disapproved' ? 'Account Disapproved' : 'Pending Admin Approval',
-        'message' => $renter['status'] === 'disapproved' 
-            ? ($renter['disapproval_reason'] ?? 'Your account was disapproved.') 
-            : 'Your account is waiting for admin approval. Payment is disabled.',
-        'restricted' => true
-    ];
-    
-    // Show restricted page
-    ?>
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <title>Payment Restricted | Carbnb</title>
-        <link rel="stylesheet" href="css/renter_style.css?v=2">
-        <link rel="stylesheet" href="css/renter_style_backup.css?v=4">
-    </head>
-    <body>
-        <div class="payment-container">
-            <h2>Payment Restricted</h2>
-            <div class="approval-card">
-                <h3><?= htmlspecialchars($account_state['title']) ?></h3>
-                <p><?= htmlspecialchars($account_state['message']) ?></p>
-                <a href="browse.php" class="btn-return">← Back to Browse</a>
-            </div>
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Payment Restricted | Carbnb</title>
+    <link rel="stylesheet" href="css/renter_style.css?v=2">
+</head>
+<body>
+
+    <div class="payment-container">
+        <h2>Payment Restricted</h2>
+
+        <div class="payment-box">
+            <h3>
+                <?= htmlspecialchars(
+                    $renter['status'] === 'disapproved'
+                        ? 'Account Disapproved'
+                        : 'Pending Admin Approval'
+                ) ?>
+            </h3>
+
+            <p>
+                <?= htmlspecialchars(
+                    $renter['status'] === 'disapproved'
+                        ? ($renter['disapproval_reason'] ?? 'Your account was disapproved.')
+                        : 'Your account is waiting for admin approval. Payment is disabled.'
+                ) ?>
+            </p>
+
+            <a href="browse.php" class="btn-return">← Back to Browse</a>
         </div>
-    </body>
-    </html>
-    <?php
+    </div>
+
+</body>
+</html>
+<?php
     exit;
 }
 
+// Check booking ID
 if (!isset($_GET['booking_id'])) {
     die('Invalid request.');
 }
 
 $booking_id = (int) $_GET['booking_id'];
 
-$stmt = $conn->prepare("SELECT b.id, b.total_price, b.status, v.name AS vehicle_name, v.image AS car_image FROM bookings b JOIN vehicles v ON b.vehicle_id = v.id WHERE b.id = ? AND b.renter_id = ?");
+// Get booking details
+$stmt = $conn->prepare("
+    SELECT 
+        b.id,
+        b.total_price,
+        b.status,
+        v.name AS vehicle_name,
+        v.image AS car_image
+    FROM bookings b
+    JOIN vehicles v ON b.vehicle_id = v.id
+    WHERE b.id = ?
+    AND b.renter_id = ?
+");
 $stmt->execute([$booking_id, $user_id]);
 $data = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -74,67 +101,19 @@ if (!$data) {
     die('Booking not found.');
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Validate form token to prevent duplicate submissions
-    $tokenError = validate_form_token_or_error('submit_payment');
-    if ($tokenError) {
-        die($tokenError);
-    }
+// Check for an existing verified payment (prevents duplicate Xendit invoices)
+$paymentStmt = $conn->prepare("
+    SELECT status
+    FROM payments
+    WHERE booking_id = ?
+");
+$paymentStmt->execute([$booking_id]);
+$existingPayment = $paymentStmt->fetch(PDO::FETCH_ASSOC);
+$alreadyPaid = $existingPayment && $existingPayment['status'] === 'verified';
 
-    $method = trim($_POST['method'] ?? '');
-    $allowedMethods = ['gcash', 'paymaya', 'cash', 'bank_transfer'];
-
-    if (!in_array($method, $allowedMethods, true)) {
-        die('Invalid payment method.');
-    }
-
-    if (!isset($_FILES['receipt']) || $_FILES['receipt']['error'] !== UPLOAD_ERR_OK) {
-        die('Upload receipt required.');
-    }
-
-    $transactionReference = trim((string) ($_POST['transaction_reference'] ?? ''));
-
-    $tmp = $_FILES['receipt']['tmp_name'];
-    $size = (int) ($_FILES['receipt']['size'] ?? 0);
-    $ext = strtolower(pathinfo($_FILES['receipt']['name'], PATHINFO_EXTENSION));
-
-    if ($size > 2 * 1024 * 1024) {
-        die('File too large (max 2MB).');
-    }
-
-    $allowedExt = ['jpg', 'jpeg', 'png'];
-    if (!in_array($ext, $allowedExt, true)) {
-        die('Invalid file type.');
-    }
-
-    $uploadDir = __DIR__ . '/../uploads/payments/';
-    if (!is_dir($uploadDir)) {
-        mkdir($uploadDir, 0777, true);
-    }
-
-    $fileName = time() . '_' . uniqid() . '.' . $ext;
-    move_uploaded_file($tmp, $uploadDir . $fileName);
-
-    $amount = (float) $data['total_price'];
-    $reference = $transactionReference !== '' ? $transactionReference : 'CARBNB-' . strtoupper(bin2hex(random_bytes(4))) . '-' . $booking_id;
-    $gatewayResponse = 'Payment submitted through renter form using ' . $method . '.';
-
-    $check = $conn->prepare('SELECT id FROM payments WHERE booking_id = ?');
-    $check->execute([$booking_id]);
-
-    if ($check->rowCount() > 0) {
-        $update = $conn->prepare("UPDATE payments SET amount = ?, proof_image = ?, payment_method = ?, transaction_reference = ?, gateway_response = ?, status = 'pending', paid_at = NOW() WHERE booking_id = ?");
-        $update->execute([$amount, $fileName, $method, $reference, $gatewayResponse, $booking_id]);
-    } else {
-        $insert = $conn->prepare("INSERT INTO payments (booking_id, amount, proof_image, payment_method, transaction_reference, gateway_response, status, paid_at) VALUES (?, ?, ?, ?, ?, ?, 'pending', NOW())");
-        $insert->execute([$booking_id, $amount, $fileName, $method, $reference, $gatewayResponse]);
-    }
-
-    header('Location: paid.php?booking_id=' . $booking_id);
-    exit;
-}
-
-function build_vehicle_image_path($value): string {
+// Build vehicle image path
+function build_vehicle_image_path($value): string
+{
     if (empty($value)) {
         return '../uploads/vehicles/default-car.svg';
     }
@@ -156,113 +135,78 @@ function build_vehicle_image_path($value): string {
 
 $imagePath = build_vehicle_image_path($data['car_image'] ?? '');
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Payment</title>
-<link rel="stylesheet" href="css/renter_style.css?v=2">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment | Carbnb</title>
+    <link rel="stylesheet" href="css/renter_style.css?v=2">
 </head>
-
 <body>
 
-<div class="payment-container">
+    <div class="payment-container">
+        <h2>Payment</h2>
 
-    <h2>Payment</h2>
+        <div class="payment-box">
+            <img src="<?= htmlspecialchars($imagePath) ?>"
+                 class="payment-image"
+                 onerror="this.src='../uploads/vehicles/default-car.svg'">
 
-    <div class="payment-box">
-        <img src="<?= htmlspecialchars($imagePath) ?>"
-             class="payment-image"
-             onerror="this.src='../uploads/vehicles/default-car.svg'">
+            <p><strong>Vehicle:</strong> <?= htmlspecialchars($data['vehicle_name']) ?></p>
+            <p><strong>Total:</strong> ₱<?= htmlspecialchars((string) $data['total_price']) ?></p>
+        </div>
 
-        <p><strong>Vehicle:</strong> <?= htmlspecialchars($data['vehicle_name']) ?></p>
-        <p><strong>Total:</strong> ₱<?= htmlspecialchars((string) $data['total_price']) ?></p>
+        <?php if ($alreadyPaid): ?>
+
+            <div class="payment-box">
+                <h3>Payment Already Completed</h3>
+                <p>This booking has already been paid for. No further action is needed.</p>
+                <a href="record.php" class="btn-return">View Payment History</a>
+            </div>
+
+        <?php else: ?>
+
+            <div class="payment-box">
+                <h3>Payment Method</h3>
+                <p>Continue your secure payment through Xendit.</p>
+            </div>
+
+            <div class="payment-form">
+                <button class="btn" type="button" id="payWithXendit">Pay with Xendit</button>
+                <a href="javascript:history.back()" class="btn-return">← Return</a>
+            </div>
+
+        <?php endif; ?>
+
     </div>
 
-    <div class="payment-box">
-        <p><strong>GCash:</strong> 09123456789</p>
-        <p><strong>PayMaya:</strong> 09876543210</p>
-    </div>
-
-    <form method="POST" enctype="multipart/form-data" class="payment-form" id="paymentForm">
-        <?= form_token_input('submit_payment') ?>
-
-        <label>Payment Method</label>
-        <select name="method" required>
-            <option value="gcash">GCash</option>
-            <option value="paymaya">PayMaya</option>
-            <option value="cash">Cash</option>
-            <option value="bank_transfer">Bank Transfer</option>
-        </select>
-
-        <label>Transaction Reference</label>
-        <input type="text" name="transaction_reference" placeholder="Optional reference number" maxlength="100">
-
-        <label>Upload Receipt</label>
-        <input type="file" name="receipt" required accept="image/png,image/jpeg">
-
-        <button class="btn" type="submit">Submit Payment</button>
-        <button class="btn" type="button" id="payWithStripe">Pay with Stripe</button>
-        <a href="javascript:history.back()" class="btn-return">← Return</a>
-
-    </form>
-
+    <?php if (!$alreadyPaid): ?>
     <script>
-    document.getElementById('paymentForm')?.addEventListener('submit', async function (event) {
-        event.preventDefault();
+        document.getElementById('payWithXendit')?.addEventListener('click', async function () {
+            const formData = new FormData();
+            formData.append('booking_id', '<?= (int) $booking_id ?>');
 
-        const fileInput = this.querySelector('input[name="receipt"]');
-        if (fileInput && fileInput.files.length === 0) {
-            alert('Please select a receipt image before submitting.');
-            return;
-        }
+            try {
+                const response = await fetch('payment_gateway.php', {
+                    method: 'POST',
+                    body: formData
+                });
 
-        const formData = new FormData(this);
-        formData.append('booking_id', '<?= (int) $booking_id ?>');
+                const result = await response.json();
 
-        try {
-            const response = await fetch('payment_api.php', {
-                method: 'POST',
-                body: formData
-            });
-            const result = await response.json();
-
-            if (result.success) {
-                window.location.href = 'browse.php';
-            } else {
-                alert(result.message || 'Unable to submit payment.');
+                if (result.success && result.checkout_url) {
+                    window.location.href = result.checkout_url;
+                } else {
+                    alert(result.message || 'Unable to start Xendit payment.');
+                }
+            } catch (error) {
+                console.error(error);
+                alert('Xendit payment could not be started.');
             }
-        } catch (error) {
-            console.error(error);
-            alert('Payment submission failed. Please try again.');
-        }
-    });
-
-    document.getElementById('payWithStripe')?.addEventListener('click', async function () {
-        const formData = new FormData();
-        formData.append('booking_id', '<?= (int) $booking_id ?>');
-
-        try {
-            const response = await fetch('payment_gateway.php', {
-                method: 'POST',
-                body: formData
-            });
-            const result = await response.json();
-
-            if (result.success && result.checkout_url) {
-                window.location.href = result.checkout_url;
-            } else {
-                alert(result.message || 'Unable to start Stripe Checkout.');
-            }
-        } catch (error) {
-            console.error(error);
-            alert('Stripe checkout could not be started.');
-        }
-    });
+        });
     </script>
-
-</div>
+    <?php endif; ?>
 
 </body>
 </html>

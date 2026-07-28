@@ -1,102 +1,314 @@
 <?php
 require_once '../database/db.php';
-session_start();
+
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['user_id'])) {
     http_response_code(401);
-    echo json_encode(['success' => false, 'message' => 'You must be logged in to pay.']);
+
+    echo json_encode([
+        'success' => false,
+        'message' => 'You must be logged in.'
+    ]);
+
     exit;
 }
 
-$user_id = (int) ($_SESSION['user_id'] ?? 0);
+
+$conn = $GLOBALS['conn'] ?? $GLOBALS['pdo'] ?? null;
+
+if (!$conn) {
+    echo json_encode([
+        'success' => false,
+        'message' => 'Database connection failed.'
+    ]);
+
+    exit;
+}
+
+
+$user_id = (int) $_SESSION['user_id'];
+
 $booking_id = (int) ($_POST['booking_id'] ?? 0);
 
+
 if ($booking_id <= 0) {
-    http_response_code(400);
-    echo json_encode(['success' => false, 'message' => 'Invalid booking reference.']);
+
+    echo json_encode([
+        'success' => false,
+        'message' => 'Invalid booking ID.'
+    ]);
+
     exit;
 }
 
-$stmt = $conn->prepare("SELECT b.id, b.total_price, b.status, b.renter_id, v.name AS vehicle_name FROM bookings b JOIN vehicles v ON b.vehicle_id = v.id WHERE b.id = ? AND b.renter_id = ?");
-$stmt->execute([$booking_id, $user_id]);
+
+
+// Get booking information
+$stmt = $conn->prepare("
+    SELECT 
+        b.id,
+        b.total_price,
+        v.name AS vehicle_name
+    FROM bookings b
+    JOIN vehicles v 
+        ON b.vehicle_id = v.id
+    WHERE b.id = ?
+    AND b.renter_id = ?
+");
+
+$stmt->execute([
+    $booking_id,
+    $user_id
+]);
+
 $booking = $stmt->fetch(PDO::FETCH_ASSOC);
 
+
 if (!$booking) {
-    http_response_code(404);
-    echo json_encode(['success' => false, 'message' => 'Booking not found.']);
-    exit;
-}
 
-$amount = (float) ($booking['total_price'] ?? 0);
-$amount_cents = (int) round($amount * 100);
-
-if ($amount_cents <= 0) {
-    http_response_code(400);
-    echo json_encode(['success' => false, 'message' => 'Booking total must be greater than zero.']);
-    exit;
-}
-
-$secret_key = getenv('STRIPE_SECRET_KEY') ?: '';
-
-if ($secret_key === '' || strpos($secret_key, 'sk_') !== 0) {
-    http_response_code(500);
     echo json_encode([
         'success' => false,
-        'message' => 'Stripe is not configured yet. Please set STRIPE_SECRET_KEY in your environment or add a test key.'
+        'message' => 'Booking not found.'
     ]);
+
     exit;
 }
 
-$scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-$host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-$base_url = $scheme . '://' . $host . '/Capstone4/Carbnb4';
-$success_url = $base_url . '/renter/payment_success.php?booking_id=' . $booking_id . '&session_id={CHECKOUT_SESSION_ID}';
-$cancel_url = $base_url . '/renter/paid.php?booking_id=' . $booking_id;
 
-$payload = http_build_query([
-    'mode' => 'payment',
-    'success_url' => $success_url,
-    'cancel_url' => $cancel_url,
-    'line_items[0][quantity]' => 1,
-    'line_items[0][price_data][currency]' => 'php',
-    'line_items[0][price_data][unit_amount]' => $amount_cents,
-    'line_items[0][price_data][product_data][name]' => 'Carbnb Booking #' . $booking_id,
-    'line_items[0][price_data][product_data][description]' => 'Vehicle rental booking payment',
-    'metadata[booking_id]' => $booking_id,
-    'metadata[user_id]' => $user_id,
-]);
 
-$ch = curl_init('https://api.stripe.com/v1/checkout/sessions');
-curl_setopt($ch, CURLOPT_POST, true);
-curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+// Xendit Secret Key
+$secret_key = "YOUR_XENDIT_SECRET_KEY";
+
+
+// Create Xendit invoice
+$payload = [
+
+    "external_id" => "CARBNB-" . $booking_id,
+
+    "amount" => (float) $booking['total_price'],
+
+    "description" =>
+        "Carbnb rental payment - " . $booking['vehicle_name'],
+
+    "invoice_duration" => 86400,
+
+
+    "success_redirect_url" =>
+        "http://localhost/Carbnb4/renter/payment_success.php?booking_id=" . $booking_id,
+
+
+    "failure_redirect_url" =>
+        "http://localhost/Carbnb4/renter/paid.php?booking_id=" . $booking_id
+];
+
+
+
+$ch = curl_init(
+    "https://api.xendit.co/v2/invoices"
+);
+
+
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-curl_setopt($ch, CURLOPT_USERPWD, $secret_key . ':');
+
+curl_setopt($ch, CURLOPT_POST, true);
+
+curl_setopt(
+    $ch,
+    CURLOPT_POSTFIELDS,
+    json_encode($payload)
+);
+
+
+curl_setopt(
+    $ch,
+    CURLOPT_HTTPHEADER,
+    [
+        "Content-Type: application/json",
+        "Authorization: Basic " . base64_encode($secret_key . ":")
+    ]
+);
+
+
 
 $response = curl_exec($ch);
-$http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+
+
+$curl_error = curl_error($ch);
+
+
+$http_code = curl_getinfo(
+    $ch,
+    CURLINFO_HTTP_CODE
+);
+
+
 curl_close($ch);
 
-if ($http_code >= 400) {
-    http_response_code(502);
+
+
+$result = json_decode(
+    $response,
+    true
+);
+
+
+
+// Xendit failed
+if (
+    $http_code >= 400 ||
+    empty($result['invoice_url'])
+) {
+
     echo json_encode([
+
         'success' => false,
-        'message' => 'Stripe checkout could not be started. Please verify the Stripe key and try again.'
+
+        'message' => 'Unable to create Xendit payment.',
+
+        'http_code' => $http_code,
+
+        'curl_error' => $curl_error,
+
+        'xendit_response' => $result,
+
+        'raw_response' => $response
+
     ]);
+
     exit;
 }
 
-$result = json_decode($response, true);
-if (empty($result['url'])) {
-    http_response_code(502);
-    echo json_encode(['success' => false, 'message' => 'Stripe did not return a checkout URL.']);
+
+
+
+// Save pending payment
+try {
+
+
+    $check = $conn->prepare(
+        "SELECT id FROM payments WHERE booking_id = ?"
+    );
+
+    $check->execute([
+        $booking_id
+    ]);
+
+
+    if ($check->rowCount() > 0) {
+
+
+        $update = $conn->prepare("
+            UPDATE payments SET
+
+                amount = ?,
+
+                payment_method = 'xendit',
+
+                transaction_reference = ?,
+
+                gateway_response = ?,
+
+                status = 'pending'
+
+            WHERE booking_id = ?
+        ");
+
+
+        $update->execute([
+
+            $booking['total_price'],
+
+            $result['id'],
+
+            json_encode($result),
+
+            $booking_id
+
+        ]);
+
+
+
+    } else {
+
+
+        $insert = $conn->prepare("
+            INSERT INTO payments
+            (
+                booking_id,
+                amount,
+                payment_method,
+                transaction_reference,
+                gateway_response,
+                status
+            )
+
+            VALUES
+            (
+                ?,
+                ?,
+                'xendit',
+                ?,
+                ?,
+                'pending'
+            )
+        ");
+
+
+
+        $insert->execute([
+
+            $booking_id,
+
+            $booking['total_price'],
+
+            $result['id'],
+
+            json_encode($result)
+
+        ]);
+
+    }
+
+
+
+} catch (PDOException $e) {
+
+
+    echo json_encode([
+
+        'success' => false,
+
+        'message' =>
+            'Payment created but database update failed.',
+
+        'error' => $e->getMessage()
+
+    ]);
+
     exit;
+
 }
+
+
+
+
+// Send checkout URL back to paid.php
 
 echo json_encode([
+
     'success' => true,
-    'checkout_url' => $result['url'],
-    'session_id' => $result['id'] ?? ''
+
+    'checkout_url' =>
+        $result['invoice_url'],
+
+    'invoice_id' =>
+        $result['id']
+
 ]);
+
 ?>

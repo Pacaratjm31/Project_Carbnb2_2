@@ -191,3 +191,11 @@ CREATE TABLE inspect (
     FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (vehicle_id) REFERENCES vehicles(id) ON DELETE CASCADE
 );
+
+ALTER TABLE payments
+ADD COLUMN gateway_payment_id VARCHAR(255) NULL,
+ADD COLUMN payment_url TEXT NULL,
+ADD COLUMN gateway_status VARCHAR(50) NULL;
+
+ALTER TABLE payments
+MODIFY COLUMN payment_method ENUM('gcash','paymaya','cash','bank_transfer','xendit') NULL;
