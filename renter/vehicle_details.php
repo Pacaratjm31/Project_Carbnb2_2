@@ -268,7 +268,7 @@ $total_reviews = (int) $rating_stats['total_reviews'];
         <?php if ($car['status'] === 'available'): ?>
             <a href="book.php?car_id=<?= $car['id'] ?>" class="btn-book">Book Now</a>
         <?php endif; ?>
-        <a href="commet_rate.php?vehicle_id=<?= $car['id'] ?>" class="btn-book" style="background:#17a2b8;">Comment & Rate</a>
+        <a href="comment_rate.php?vehicle_id=<?= $car['id'] ?>" class="btn-book" style="background:#17a2b8;">Comment & Rate</a>
         <a href="browse.php" class="btn-back">← Back to Browse</a>
     </div>
 </div>

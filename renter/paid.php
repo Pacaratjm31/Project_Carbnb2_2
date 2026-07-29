@@ -101,7 +101,7 @@ if (!$data) {
     die('Booking not found.');
 }
 
-// Check for an existing verified payment (prevents duplicate Xendit invoices)
+// Check for an existing payment record and its admin-approval status
 $paymentStmt = $conn->prepare("
     SELECT status
     FROM payments
@@ -109,7 +109,8 @@ $paymentStmt = $conn->prepare("
 ");
 $paymentStmt->execute([$booking_id]);
 $existingPayment = $paymentStmt->fetch(PDO::FETCH_ASSOC);
-$alreadyPaid = $existingPayment && $existingPayment['status'] === 'verified';
+
+$paymentStatus = $existingPayment['status'] ?? null; // null, 'pending', 'verified', or 'disapproved'
 
 // Build vehicle image path
 function build_vehicle_image_path($value): string
@@ -157,23 +158,50 @@ $imagePath = build_vehicle_image_path($data['car_image'] ?? '');
             <p><strong>Total:</strong> ₱<?= htmlspecialchars((string) $data['total_price']) ?></p>
         </div>
 
-        <?php if ($alreadyPaid): ?>
+        <?php if ($paymentStatus === 'verified'): ?>
 
             <div class="payment-box">
-                <h3>Payment Already Completed</h3>
-                <p>This booking has already been paid for. No further action is needed.</p>
+                <h3>Payment Completed</h3>
+                <p>This booking has been paid and verified by the admin. No further action is needed.</p>
+                <a href="record.php" class="btn-return">View Payment History</a>
+            </div>
+
+        <?php elseif ($paymentStatus === 'pending'): ?>
+
+            <div class="payment-box">
+                <h3>Payment Received — Awaiting Admin Verification</h3>
+                <p>Your payment was received and is now waiting for admin approval. You'll be notified once it's verified.</p>
                 <a href="record.php" class="btn-return">View Payment History</a>
             </div>
 
         <?php else: ?>
 
+            <?php if ($paymentStatus === 'disapproved'): ?>
             <div class="payment-box">
-                <h3>Payment Method</h3>
-                <p>Continue your secure payment through Xendit.</p>
+                <h3>Payment Disapproved</h3>
+                <p>Your previous payment was disapproved by the admin. Please try paying again below.</p>
+            </div>
+            <?php endif; ?>
+
+            <div class="payment-box">
+                <h3>Pay with Xendit</h3>
+                <p>Continue your secure automatic payment through Xendit.</p>
             </div>
 
             <div class="payment-form">
                 <button class="btn" type="button" id="payWithXendit">Pay with Xendit</button>
+            </div>
+
+            <div class="payment-form">
+                <p>Send your payment receipt here for admin verification.</p>
+                <form id="manualPaymentForm" enctype="multipart/form-data">
+                    <input type="file" name="proof_image" id="proof_image" accept="image/jpeg,image/png,image/webp" required>
+
+                    <button class="btn" type="submit" id="submitPaymentBtn" style="margin-top:10px;">Submit Payment</button>
+                </form>
+            </div>
+
+            <div class="payment-form">
                 <a href="javascript:history.back()" class="btn-return">← Return</a>
             </div>
 
@@ -181,7 +209,7 @@ $imagePath = build_vehicle_image_path($data['car_image'] ?? '');
 
     </div>
 
-    <?php if (!$alreadyPaid): ?>
+    <?php if ($paymentStatus !== 'verified' && $paymentStatus !== 'pending'): ?>
     <script>
         document.getElementById('payWithXendit')?.addEventListener('click', async function () {
             const formData = new FormData();
@@ -196,13 +224,47 @@ $imagePath = build_vehicle_image_path($data['car_image'] ?? '');
                 const result = await response.json();
 
                 if (result.success && result.checkout_url) {
-                    window.location.href = result.checkout_url;
+                    window.open(result.checkout_url, '_blank');
                 } else {
                     alert(result.message || 'Unable to start Xendit payment.');
                 }
             } catch (error) {
                 console.error(error);
                 alert('Xendit payment could not be started.');
+            }
+        });
+
+        document.getElementById('manualPaymentForm')?.addEventListener('submit', async function (e) {
+            e.preventDefault();
+
+            const submitBtn = document.getElementById('submitPaymentBtn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Submitting...';
+
+            const formData = new FormData(this);
+            formData.append('booking_id', '<?= (int) $booking_id ?>');
+
+            try {
+                const response = await fetch('payment_api.php', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert(result.message || 'Payment submitted. Waiting for admin verification.');
+                    window.location.reload();
+                } else {
+                    alert(result.message || 'Unable to submit payment.');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Submit Payment';
+                }
+            } catch (error) {
+                console.error(error);
+                alert('Payment submission failed.');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit Payment';
             }
         });
     </script>

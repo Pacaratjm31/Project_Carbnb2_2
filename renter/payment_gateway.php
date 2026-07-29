@@ -82,7 +82,8 @@ if (!$booking) {
 
 
 // Xendit Secret Key
-$secret_key = "YOUR_XENDIT_SECRET_KEY";
+$secret_key = "xnd_development_FjSOCj6vtWAm33KqtQ2P3UfneRCI3VRc6f5quqX5wUZCHq1AJYkInOUdYZFA";
+
 
 
 // Create Xendit invoice
@@ -99,11 +100,11 @@ $payload = [
 
 
     "success_redirect_url" =>
-        "http://localhost/Carbnb4/renter/payment_success.php?booking_id=" . $booking_id,
+        "http://localhost/Carbnb_project2_2/renter/paid.php?booking_id=" . $booking_id,
 
 
     "failure_redirect_url" =>
-        "http://localhost/Carbnb4/renter/paid.php?booking_id=" . $booking_id
+        "http://localhost/Carbnb_project2_2/renter/paid.php?booking_id=" . $booking_id
 ];
 
 
@@ -296,6 +297,22 @@ try {
 
 
 
+
+// Send checkout URL back to paid.php
+
+echo json_encode([
+
+    'success' => true,
+
+    'checkout_url' =>
+        $result['invoice_url'],
+
+    'invoice_id' =>
+        $result['id']
+
+]);
+
+?>
 
 // Send checkout URL back to paid.php
 

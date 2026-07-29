@@ -272,7 +272,7 @@ function build_vehicle_image_path($value): string {
 <div class="card-actions">
              <div class="action-buttons">
                  <a href="vehicle_details.php?car_id=<?= (int) $car['id'] ?>" class="book-btn">View Details</a><br><br>
-                 <a href="commet_rate.php?vehicle_id=<?= (int) $car['id'] ?>" class="book-btn" style="background:#17a2b8;">Comment & Rate</a><br><br>
+                 <a href="comment_rate.php?vehicle_id=<?= (int) $car['id'] ?>" class="book-btn" style="background:#17a2b8;">Comment & Rate</a><br><br>
                  <?php if ($account_state['restricted']): ?>
                      <button class="book-btn disabled" disabled>
                          <?= $account_state['status'] === 'disapproved' ? 'Access Restricted' : 'Approval Pending' ?>

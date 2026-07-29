@@ -118,27 +118,27 @@ try {
       <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px;">
         <div class="stat-box">
           <h3>Total Revenue (All)</h3>
-          <p>$<?= number_format($totalRevenue, 2) ?></p>
+          <p>₱<?= number_format($totalRevenue, 2) ?></p>
         </div>
 
         <div class="stat-box">
           <h3>Verified Revenue</h3>
-          <p>$<?= number_format($verifiedRevenue, 2) ?></p>
+          <p>₱<?= number_format($verifiedRevenue, 2) ?></p>
         </div>
 
         <div class="stat-box">
           <h3>Pending Payments</h3>
-          <p>$<?= number_format($pendingRevenue, 2) ?></p>
+          <p>₱<?= number_format($pendingRevenue, 2) ?></p>
         </div>
 
         <div class="stat-box">
           <h3>Commission (20%)</h3>
-          <p>$<?= number_format($totalCommission, 2) ?></p>
+          <p>₱<?= number_format($totalCommission, 2) ?></p>
         </div>
 
         <div class="stat-box">
           <h3>Owner Earnings (80%)</h3>
-          <p>$<?= number_format($totalOwnerIncome, 2) ?></p>
+          <p>₱<?= number_format($totalOwnerIncome, 2) ?></p>
         </div>
 
         <div class="stat-box">
@@ -159,14 +159,15 @@ try {
                 <th>Owner</th>
                 <th>Vehicle</th>
                 <th>Amount</th>
-                <th>Receipt</th>
+                <th>Method</th>
+                <th>Receipt / Proof</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               <?php if (empty($pending_payments)): ?>
                 <tr>
-                  <td colspan="7" class="empty-state">No pending payments to approve.</td>
+                  <td colspan="8" class="empty-state">No pending payments to approve.</td>
                 </tr>
               <?php else: ?>
                 <?php foreach ($pending_payments as $payment): ?>
@@ -175,13 +176,24 @@ try {
                     <td><?= clean($payment['renter_name']) ?><br><small><?= clean($payment['renter_email']) ?></small></td>
                     <td><?= clean($payment['owner_name']) ?><br><small><?= clean($payment['owner_email']) ?></small></td>
                     <td><?= clean($payment['vehicle_name']) ?></td>
-                    <td>$<?= number_format($payment['amount'], 2) ?></td>
+                    <td>₱<?= number_format($payment['amount'], 2) ?></td>
+                    <td>
+                      <?php if (!empty($payment['payment_method'])): ?>
+                        <span class="status-badge"><?= clean(strtoupper($payment['payment_method'])) ?></span>
+                      <?php else: ?>
+                        <span class="text-muted">—</span>
+                      <?php endif; ?>
+                    </td>
                     <td>
                       <?php if (!empty($payment['proof_image'])): ?>
                         <a href="../uploads/payments/<?= clean($payment['proof_image']) ?>" target="_blank">
                           <img src="../uploads/payments/<?= clean($payment['proof_image']) ?>" 
                                style="max-width:60px; max-height:60px; object-fit:cover; border-radius:6px;" 
                                alt="Receipt">
+                        </a>
+                      <?php elseif (!empty($payment['payment_url'])): ?>
+                        <a href="<?= clean($payment['payment_url']) ?>" target="_blank">
+                          View Xendit Invoice
                         </a>
                       <?php else: ?>
                         <span class="text-muted">No receipt</span>
@@ -218,6 +230,7 @@ try {
                 <th>Owner</th>
                 <th>Vehicle</th>
                 <th>Amount</th>
+                <th>Method</th>
                 <th>Status</th>
                 <th>Date</th>
               </tr>
@@ -225,7 +238,7 @@ try {
             <tbody>
               <?php if (empty($all_payments)): ?>
                 <tr>
-                  <td colspan="7" class="empty-state">No payment records found.</td>
+                  <td colspan="8" class="empty-state">No payment records found.</td>
                 </tr>
               <?php else: ?>
                 <?php foreach ($all_payments as $payment): ?>
@@ -234,7 +247,14 @@ try {
                     <td><?= clean($payment['renter_name']) ?></td>
                     <td><?= clean($payment['owner_name']) ?></td>
                     <td><?= clean($payment['vehicle_name']) ?></td>
-                    <td>$<?= number_format($payment['amount'], 2) ?></td>
+                    <td>₱<?= number_format($payment['amount'], 2) ?></td>
+                    <td>
+                      <?php if (!empty($payment['payment_method'])): ?>
+                        <?= clean(strtoupper($payment['payment_method'])) ?>
+                      <?php else: ?>
+                        <span class="text-muted">—</span>
+                      <?php endif; ?>
+                    </td>
                     <td>
                       <span class="status-badge <?= statusBadgeClass($payment['payment_status']) ?>">
                         <?= statusLabel($payment['payment_status']) ?>

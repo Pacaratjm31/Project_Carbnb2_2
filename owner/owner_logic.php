@@ -68,7 +68,7 @@ function get_current_owner(PDO $pdo): array {
 }
 
 function format_currency($value): string {
-    return '$' . number_format((float) $value, 2);
+    return '₱' . number_format((float) $value, 2);
 }
 
 function format_date($value): string {
@@ -197,7 +197,16 @@ function get_owner_income(PDO $pdo, int $owner_id): array {
     $stmt->execute([$owner_id]);
     $monthly = (float) $stmt->fetchColumn();
 
-    $stmt = $pdo->prepare("SELECT COALESCE(SUM(b.total_price), 0) AS pending FROM bookings b JOIN vehicles v ON v.id = b.vehicle_id WHERE v.owner_id = ? AND b.status = 'pending'");
+    // Pending payout: renter has paid via Xendit (payments.status = 'pending'),
+    // but the admin hasn't approved it yet, so it hasn't reached the earnings table.
+    // Shown as the owner's projected 80% share.
+    $stmt = $pdo->prepare("
+        SELECT COALESCE(SUM(p.amount) * 0.80, 0) AS pending
+        FROM payments p
+        JOIN bookings b ON b.id = p.booking_id
+        JOIN vehicles v ON v.id = b.vehicle_id
+        WHERE v.owner_id = ? AND p.status = 'pending'
+    ");
     $stmt->execute([$owner_id]);
     $pending = (float) $stmt->fetchColumn();
 
