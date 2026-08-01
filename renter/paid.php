@@ -138,18 +138,8 @@ $imagePath = build_vehicle_image_path($data['car_image'] ?? '');
 
 $ajax = isset($_GET['ajax']) && $_GET['ajax'] === '1';
 if ($ajax && ($_GET['section'] ?? '') === 'payment-status') {
-    if ($paymentStatus === 'verified') {
-        echo '<div class="payment-box">';
-        echo '<h3>Payment Completed</h3>';
-        echo '<p>This booking has been paid and verified by the admin. No further action is needed.</p>';
-        echo '<a href="record.php" class="btn-return">View Payment History</a>';
-        echo '</div>';
-    } elseif ($paymentStatus === 'pending') {
-        echo '<div class="payment-box">';
-        echo '<h3>Payment Received — Awaiting Admin Verification</h3>';
-        echo '<p>Your payment was received and is now waiting for admin approval. You\'ll be notified once it\'s verified.</p>';
-        echo '<a href="record.php" class="btn-return">View Payment History</a>';
-        echo '</div>';
+    if ($paymentStatus === 'verified' || $paymentStatus === 'pending') {
+        // Intentionally left blank: no message, no payment form, no upload form.
     } else {
         if ($paymentStatus === 'disapproved') {
             echo '<div class="payment-box">';
@@ -205,21 +195,9 @@ if ($ajax && ($_GET['section'] ?? '') === 'payment-status') {
         </div>
 
         <div id="renter-payment-status" data-live-refresh="paid.php?ajax=1&section=payment-status&booking_id=<?= (int) $booking_id ?>" data-live-target="#renter-payment-status">
-            <?php if ($paymentStatus === 'verified'): ?>
+            <?php if ($paymentStatus === 'verified' || $paymentStatus === 'pending'): ?>
 
-                <div class="payment-box">
-                    <h3>Payment Completed</h3>
-                    <p>This booking has been paid and verified by the admin. No further action is needed.</p>
-                    <a href="record.php" class="btn-return">View Payment History</a>
-                </div>
-
-            <?php elseif ($paymentStatus === 'pending'): ?>
-
-                <div class="payment-box">
-                    <h3>Payment Received — Awaiting Admin Verification</h3>
-                    <p>Your payment was received and is now waiting for admin approval. You'll be notified once it's verified.</p>
-                    <a href="record.php" class="btn-return">View Payment History</a>
-                </div>
+                <?php /* Intentionally left blank: no message, no payment form, no upload form. */ ?>
 
             <?php else: ?>
 
@@ -257,7 +235,6 @@ if ($ajax && ($_GET['section'] ?? '') === 'payment-status') {
 
     </div>
 
-    <?php if ($paymentStatus !== 'verified' && $paymentStatus !== 'pending'): ?>
     <script>
 
 function refreshPaymentStatus() {
@@ -687,7 +664,6 @@ async function(e) {
 
 
 </script>
-    <?php endif; ?>
 
 </body>
 </html>

@@ -1,4 +1,4 @@
-USE carbnb;
+USE if0_42554417_carbnb;
 
 CREATE TABLE users (
     id INT AUTO_INCREMENT PRIMARY KEY,

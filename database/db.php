@@ -39,6 +39,24 @@ function ensure_column(PDO $pdo, string $table, string $column, string $definiti
     ");
 }
 
+function ensure_table(PDO $pdo, string $table, string $definition): void
+{
+    $checkTable = $pdo->prepare("
+        SELECT COUNT(*)
+        FROM information_schema.tables
+        WHERE table_schema = DATABASE()
+        AND table_name = ?
+    ");
+
+    $checkTable->execute([$table]);
+
+    if ($checkTable->fetchColumn()) {
+        return;
+    }
+
+    $pdo->exec("CREATE TABLE `$table` ($definition)");
+}
+
 try {
 
     $pdo = new PDO(
@@ -63,6 +81,18 @@ try {
     ensure_column($pdo, 'payments', 'transaction_reference', 'VARCHAR(100) NULL');
     ensure_column($pdo, 'payments', 'gateway_response', 'TEXT NULL');
     ensure_column($pdo, 'payments', 'paid_at', 'DATETIME NULL');
+    ensure_table(
+        $pdo,
+        'renter_locations',
+        "id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        latitude DECIMAL(10,8) NOT NULL,
+        longitude DECIMAL(11,8) NOT NULL,
+        accuracy DECIMAL(10,2) NULL,
+        recorded_at DATETIME NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE"
+    );
 
 } catch (PDOException $e) {
 

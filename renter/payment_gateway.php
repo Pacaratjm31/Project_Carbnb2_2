@@ -24,7 +24,7 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 
-// Check database
+// Check database connection
 if (!$conn) {
 
     echo json_encode([
@@ -36,12 +36,13 @@ if (!$conn) {
 }
 
 
+
 $user_id = (int) $_SESSION['user_id'];
 
 $booking_id = (int) ($_POST['booking_id'] ?? 0);
 
 
-// Validate booking ID
+
 if ($booking_id <= 0) {
 
     echo json_encode([
@@ -67,10 +68,12 @@ $stmt = $conn->prepare("
     AND b.renter_id = ?
 ");
 
+
 $stmt->execute([
     $booking_id,
     $user_id
 ]);
+
 
 $booking = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -92,7 +95,7 @@ if (!$booking) {
 // XENDIT SECRET KEY
 // =============================
 
-$secret_key = "xnd_development_FjSOCj6vtWAm33KqtQ2P3UfneRCI3VRc6f5quqX5wUZCHq1AJYkInOUdYZFA";
+$secret_key = "YOUR_NEW_XENDIT_SECRET_KEY";
 
 
 
@@ -107,21 +110,17 @@ $payload = [
     "amount" => (float) $booking['total_price'],
 
     "description" =>
-        "Carbnb rental payment - " . $booking['vehicle_name'],
+        "Carbnb rental payment - " .
+        $booking['vehicle_name'],
 
-    "invoice_duration" => 86400,
+    "invoice_duration" => 86400
 
-
-    // CHANGE THIS AFTER HOSTING
-    "success_redirect_url" =>
-        "http://localhost/Carbnb_project2_2/renter/paid.php?booking_id=" . $booking_id,
-
-
-    "failure_redirect_url" =>
-        "http://localhost/Carbnb_project2_2/renter/paid.php?booking_id=" . $booking_id
 ];
 
 
+
+
+// Send request to Xendit
 
 $ch = curl_init(
     "https://api.xendit.co/v2/invoices"
@@ -151,7 +150,9 @@ curl_setopt_array($ch, [
 
 $response = curl_exec($ch);
 
+
 $curl_error = curl_error($ch);
+
 
 $http_code = curl_getinfo(
     $ch,
@@ -163,7 +164,11 @@ curl_close($ch);
 
 
 
-$result = json_decode($response, true);
+$result = json_decode(
+    $response,
+    true
+);
+
 
 
 
@@ -180,11 +185,14 @@ if (
 
         'success' => false,
 
-        'message' => 'Unable to create Xendit payment.',
+        'message' =>
+            'Unable to create Xendit payment.',
 
-        'error' => $curl_error,
+        'error' =>
+            $curl_error,
 
-        'response' => $result
+        'response' =>
+            $result
 
     ]);
 
@@ -202,10 +210,11 @@ try {
 
 
     $check = $conn->prepare("
-        SELECT id 
-        FROM payments 
+        SELECT id
+        FROM payments
         WHERE booking_id = ?
     ");
+
 
     $check->execute([
         $booking_id
@@ -231,6 +240,7 @@ try {
 
             WHERE booking_id = ?
         ");
+
 
 
         $update->execute([
@@ -290,7 +300,7 @@ try {
 
 
 
-} catch (PDOException $e) {
+} catch(PDOException $e) {
 
 
     echo json_encode([
@@ -327,6 +337,7 @@ echo json_encode([
         $result['id']
 
 ]);
+
 
 exit;
 
