@@ -1,4 +1,33 @@
-<?php require_once 'manage_users_logic.php'; ?>
+<?php require_once 'manage_users_logic.php';
+
+$ajax = isset($_GET['ajax']) && $_GET['ajax'] === '1';
+if ($ajax && ($_GET['section'] ?? '') === 'registered-users') {
+  if (empty($users)) {
+    echo '<tr><td colspan="7" class="empty-state">No users found.</td></tr>';
+  } else {
+    foreach ($users as $user) {
+      echo '<tr>';
+      echo '<td class="cell-name" data-label="Name">' . clean($user['full_name']) . '</td>';
+      echo '<td class="cell-email" data-label="Email">' . clean($user['email']) . '</td>';
+      echo '<td data-label="Role">' . clean(ucfirst($user['role'])) . '</td>';
+      echo '<td data-label="Status"><span class="status-badge ' . statusBadgeClass($user['status']) . '">' . statusLabel($user['status']) . '</span></td>';
+      echo '<td data-label="Registered">' . formatDate($user['created_at']) . '</td>';
+      echo '<td class="cell-actions" data-label="Documents"><div class="action-group"><button class="view-docs-btn" type="button" onclick="openDocModal(' . $user['id'] . ', \'' . clean($user['full_name']) . '\', \'' . clean($user['role']) . '\')">View Documents</button></div></td>';
+      echo '<td class="cell-actions" data-label="Action"><div class="action-group">';
+      if ($user['status'] === 'pending') {
+        echo '<a href="manage_users.php?action=approve&id=' . $user['id'] . '" class="action-btn-small approve">Approve</a>';
+        echo '<a href="manage_users.php?action=reject&id=' . $user['id'] . '" class="action-btn-small reject" onclick="return disapproveUser(' . $user['id'] . ')">Disapprove</a>';
+      } elseif ($user['status'] === 'approved') {
+        echo '<span class="text-success">Approved</span>';
+      } else {
+        echo '<span class="text-danger">Disapproved</span>';
+      }
+      echo '</div></td></tr>';
+    }
+  }
+  exit;
+}
+?>
 
 <!DOCTYPE html>
 <html lang="en">
@@ -117,6 +146,7 @@
       color: var(--danger);
     }
   </style>
+  <link rel="stylesheet" href="css/admin_responsive.css?v=20260801">
 </head>
 <body>
   <div class="overlay"></div>
@@ -181,7 +211,7 @@
                 <th>Action</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody id="admin-users-table" data-live-refresh="manage_users.php?ajax=1&section=registered-users" data-live-target="#admin-users-table">
               <?php if (empty($users)): ?>
                 <tr>
                   <td colspan="7" class="empty-state">No users found.</td>
@@ -189,30 +219,34 @@
               <?php else: ?>
                 <?php foreach ($users as $user): ?>
                   <tr>
-                    <td><?= clean($user['full_name']) ?></td>
-                    <td><?= clean($user['email']) ?></td>
-                    <td><?= clean(ucfirst($user['role'])) ?></td>
-                    <td>
+                    <td class="cell-name" data-label="Name"><?= clean($user['full_name']) ?></td>
+                    <td class="cell-email" data-label="Email"><?= clean($user['email']) ?></td>
+                    <td data-label="Role"><?= clean(ucfirst($user['role'])) ?></td>
+                    <td data-label="Status">
                       <span class="status-badge <?= statusBadgeClass($user['status']) ?>">
                         <?= statusLabel($user['status']) ?>
                       </span>
                     </td>
-                    <td><?= formatDate($user['created_at']) ?></td>
-                    <td>
-                      <button class="view-docs-btn" type="button" 
-                              onclick="openDocModal(<?= $user['id'] ?>, '<?= clean($user['full_name']) ?>', '<?= clean($user['role']) ?>')">
-                        View Documents
-                      </button>
+                    <td data-label="Registered"><?= formatDate($user['created_at']) ?></td>
+                    <td class="cell-actions" data-label="Documents">
+                      <div class="action-group">
+                        <button class="view-docs-btn" type="button" 
+                                onclick="openDocModal(<?= $user['id'] ?>, '<?= clean($user['full_name']) ?>', '<?= clean($user['role']) ?>')">
+                          View Documents
+                        </button>
+                      </div>
                     </td>
-                    <td>
-                      <?php if ($user['status'] === 'pending'): ?>
-                        <a href="manage_users.php?action=approve&id=<?= $user['id'] ?>" class="action-btn-small approve">Approve</a>
-                        <a href="manage_users.php?action=reject&id=<?= $user['id'] ?>" class="action-btn-small reject" onclick="return disapproveUser(<?= $user['id'] ?>)">Disapprove</a>
-                      <?php elseif ($user['status'] === 'approved'): ?>
-                        <span class="text-success">Approved</span>
-                      <?php else: ?>
-                        <span class="text-danger">Disapproved</span>
-                      <?php endif; ?>
+                    <td class="cell-actions" data-label="Action">
+                      <div class="action-group">
+                        <?php if ($user['status'] === 'pending'): ?>
+                          <a href="manage_users.php?action=approve&id=<?= $user['id'] ?>" class="action-btn-small approve">Approve</a>
+                          <a href="manage_users.php?action=reject&id=<?= $user['id'] ?>" class="action-btn-small reject" onclick="return disapproveUser(<?= $user['id'] ?>)">Disapprove</a>
+                        <?php elseif ($user['status'] === 'approved'): ?>
+                          <span class="text-success">Approved</span>
+                        <?php else: ?>
+                          <span class="text-danger">Disapproved</span>
+                        <?php endif; ?>
+                      </div>
                     </td>
                   </tr>
                 <?php endforeach; ?>

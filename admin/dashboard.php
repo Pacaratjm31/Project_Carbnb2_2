@@ -1,4 +1,27 @@
-<?php require_once 'dashboard_logic.php'; ?>
+<?php require_once 'dashboard_logic.php'; 
+
+$ajax = isset($_GET['ajax']) && $_GET['ajax'] === '1';
+if ($ajax && ($_GET['section'] ?? '') === 'stats-grid') {
+  echo '<div class="stat-box"><h3>Pending Users</h3><p>' . (int) $totalPendingUsers . '</p></div>';
+  echo '<div class="stat-box"><h3>Pending Vehicles</h3><p>' . (int) $totalPendingVehicles . '</p></div>';
+  echo '<div class="stat-box"><h3>Pending Bookings</h3><p>' . (int) $totalPendingBookings . '</p></div>';
+  echo '<div class="stat-box"><h3>Pending Payments</h3><p>' . (int) $totalPendingPayments . '</p></div>';
+  echo '<div class="stat-box"><h3>Pending Messages</h3><p>' . (int) $totalPendingMessages . '</p></div>';
+  exit;
+}
+
+if ($ajax && ($_GET['section'] ?? '') === 'overview-table') {
+  echo '<tr><td data-label="Category">Total Users (Owners + Renters)</td><td data-label="Count">' . (int) $totalUsers . '</td></tr>';
+  echo '<tr><td data-label="Category">Total Owners</td><td data-label="Count">' . (int) $totalOwners . '</td></tr>';
+  echo '<tr><td data-label="Category">Total Renters</td><td data-label="Count">' . (int) $totalRenters . '</td></tr>';
+  echo '<tr><td data-label="Category">Total Vehicles</td><td data-label="Count">' . (int) $totalVehicles . '</td></tr>';
+  echo '<tr><td data-label="Category">Total Bookings</td><td data-label="Count">' . (int) $totalBookings . '</td></tr>';
+  echo '<tr><td data-label="Category">Total Payments</td><td data-label="Count">' . (int) $totalPayments . '</td></tr>';
+  echo '<tr><td data-label="Category">Deleted Users</td><td data-label="Count">' . (int) $totalDeletedUsers . '</td></tr>';
+  echo '<tr><td data-label="Category">Total Contact Messages</td><td data-label="Count">' . (int) $totalContactMessages . '</td></tr>';
+  exit;
+}
+?>
 
 <!DOCTYPE html>
 <html lang="en">
@@ -8,6 +31,7 @@
   <title>Admin Dashboard | Carbnb</title>
   <link rel="stylesheet" href="css/admin_style.css?v=20260702">
   <link rel="stylesheet" href="css/admin_style_backup.css?v=20260702">
+  <link rel="stylesheet" href="css/admin_responsive.css?v=20260801">
 </head>
 <body>
   <div class="overlay"></div>
@@ -51,7 +75,7 @@
         </div>
       <?php endif; ?>
 
-      <section class="stats-grid">
+      <section class="stats-grid" id="admin-dashboard-stats" data-live-refresh="dashboard.php?ajax=1&section=stats-grid" data-live-target="#admin-dashboard-stats">
         <div class="stat-box">
           <h3>Pending Users</h3>
           <p><?= $totalPendingUsers ?></p>
@@ -98,38 +122,38 @@
                 <th>Count</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody id="admin-overview-table" data-live-refresh="dashboard.php?ajax=1&section=overview-table" data-live-target="#admin-overview-table">
               <tr>
-                <td>Total Users (Owners + Renters)</td>
-                <td><?= $totalUsers ?></td>
+                <td data-label="Category">Total Users (Owners + Renters)</td>
+                <td data-label="Count"><?= $totalUsers ?></td>
               </tr>
               <tr>
-                <td>Total Owners</td>
-                <td><?= $totalOwners ?></td>
+                <td data-label="Category">Total Owners</td>
+                <td data-label="Count"><?= $totalOwners ?></td>
               </tr>
               <tr>
-                <td>Total Renters</td>
-                <td><?= $totalRenters ?></td>
+                <td data-label="Category">Total Renters</td>
+                <td data-label="Count"><?= $totalRenters ?></td>
               </tr>
               <tr>
-                <td>Total Vehicles</td>
-                <td><?= $totalVehicles ?></td>
+                <td data-label="Category">Total Vehicles</td>
+                <td data-label="Count"><?= $totalVehicles ?></td>
               </tr>
               <tr>
-                <td>Total Bookings</td>
-                <td><?= $totalBookings ?></td>
+                <td data-label="Category">Total Bookings</td>
+                <td data-label="Count"><?= $totalBookings ?></td>
               </tr>
               <tr>
-                <td>Total Payments</td>
-                <td><?= $totalPayments ?></td>
+                <td data-label="Category">Total Payments</td>
+                <td data-label="Count"><?= $totalPayments ?></td>
               </tr>
               <tr>
-                <td>Deleted Users</td>
-                <td><?= $totalDeletedUsers ?></td>
+                <td data-label="Category">Deleted Users</td>
+                <td data-label="Count"><?= $totalDeletedUsers ?></td>
               </tr>
               <tr>
-                <td>Total Contact Messages</td>
-                <td><?= $totalContactMessages ?></td>
+                <td data-label="Category">Total Contact Messages</td>
+                <td data-label="Count"><?= $totalContactMessages ?></td>
               </tr>
             </tbody>
           </table>
@@ -183,6 +207,30 @@
         });
       });
     });
+
+    (function () {
+      const refreshTargets = document.querySelectorAll('[data-live-refresh]');
+      refreshTargets.forEach(function (element) {
+        const refreshUrl = element.dataset.liveRefresh;
+        const targetSelector = element.dataset.liveTarget || '#' + element.id;
+        const refreshSection = function () {
+          fetch(refreshUrl)
+            .then(function (response) { return response.text(); })
+            .then(function (html) {
+              const targetNode = document.querySelector(targetSelector);
+              if (targetNode) {
+                targetNode.innerHTML = html;
+              }
+            })
+            .catch(function (error) {
+              console.log('Dashboard live refresh failed:', error);
+            });
+        };
+
+        refreshSection();
+        setInterval(refreshSection, 8000);
+      });
+    })();
   </script>
 </body>
 </html>

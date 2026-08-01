@@ -1,4 +1,36 @@
-<?php require_once 'booking_records_logic.php'; ?>
+<?php require_once 'booking_records_logic.php'; 
+
+$ajax = isset($_GET['ajax']) && $_GET['ajax'] === '1';
+if ($ajax && ($_GET['section'] ?? '') === 'booking-history') {
+  if (empty($records)) {
+    echo '<tr><td colspan="8" class="empty-state">No booking records found.</td></tr>';
+  } else {
+    foreach ($records as $record) {
+      echo '<tr>';
+      echo '<td data-label="Booking ID">#' . (int) $record['id'] . '</td>';
+      echo '<td data-label="Renter">' . clean($record['renter_name']) . '</td>';
+      echo '<td data-label="Vehicle">' . clean($record['vehicle_name']) . '</td>';
+      echo '<td data-label="Owner">' . clean($record['owner_name']) . '</td>';
+      echo '<td data-label="Rental Date">' . formatDate($record['start_date']) . ' - ' . formatDate($record['end_date']) . '</td>';
+      echo '<td data-label="Total Price">$' . number_format($record['total_price'], 2) . '</td>';
+      echo '<td data-label="Status"><span class="status-badge ' . statusBadgeClass($record['status']) . '">' . statusLabel($record['status']) . '</span></td>';
+      echo '<td class="cell-actions" data-label="Action"><div class="action-group">';
+      if ($record['status'] === 'pending') {
+        echo '<form method="POST" action="booking_records_logic.php"><input type="hidden" name="booking_id" value="' . $record['id'] . '"><input type="hidden" name="action" value="approve"><button type="submit" class="action-btn-small approve">Approve</button></form>';
+        echo '<button class="action-btn-small reject" onclick="showRejectModal(' . $record['id'] . ')">Disapprove</button>';
+      } elseif ($record['status'] === 'approved') {
+        echo '<span class="text-success">Approved</span>';
+      } elseif ($record['status'] === 'disapproved') {
+        echo '<span class="text-danger">Disapproved</span>';
+      } else {
+        echo '<span class="text-muted">Completed</span>';
+      }
+      echo '</div></td></tr>';
+    }
+  }
+  exit;
+}
+?>
 
 <!DOCTYPE html>
 <html lang="en">
@@ -8,6 +40,7 @@
   <title>Rental Records | Carbnb Admin</title>
   <link rel="stylesheet" href="css/admin_style.css?v=20260702">
   <link rel="stylesheet" href="css/admin_style_backup.css?v=20260702">
+  <link rel="stylesheet" href="css/admin_responsive.css?v=20260801">
 </head>
 <body>
   <div class="overlay"></div>
@@ -59,7 +92,7 @@
 
       <section class="card">
         <h3 class="section-title">Booking History</h3>
-        <div class="table-wrapper">
+        <div class="table-wrapper only-desktop">
           <table class="table">
             <thead>
               <tr>
@@ -73,7 +106,7 @@
                 <th>Action</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody id="admin-booking-history" data-live-refresh="booking_records.php?ajax=1&section=booking-history" data-live-target="#admin-booking-history">
               <?php if (empty($records)): ?>
                 <tr>
                   <td colspan="8" class="empty-state">No booking records found.</td>
@@ -81,38 +114,105 @@
               <?php else: ?>
                 <?php foreach ($records as $record): ?>
                   <tr>
-                    <td>#<?= $record['id'] ?></td>
-                    <td><?= clean($record['renter_name']) ?></td>
-                    <td><?= clean($record['vehicle_name']) ?></td>
-                    <td><?= clean($record['owner_name']) ?></td>
-                    <td><?= formatDate($record['start_date']) ?> - <?= formatDate($record['end_date']) ?></td>
-                    <td>$<?= number_format($record['total_price'], 2) ?></td>
-                    <td>
+                    <td data-label="Booking ID">#<?= $record['id'] ?></td>
+                    <td data-label="Renter"><?= clean($record['renter_name']) ?></td>
+                    <td data-label="Vehicle"><?= clean($record['vehicle_name']) ?></td>
+                    <td data-label="Owner"><?= clean($record['owner_name']) ?></td>
+                    <td data-label="Rental Date"><?= formatDate($record['start_date']) ?> - <?= formatDate($record['end_date']) ?></td>
+                    <td data-label="Total Price">$<?= number_format($record['total_price'], 2) ?></td>
+                    <td data-label="Status">
                       <span class="status-badge <?= statusBadgeClass($record['status']) ?>">
                         <?= statusLabel($record['status']) ?>
                       </span>
                     </td>
-                    <td>
-                      <?php if ($record['status'] === 'pending'): ?>
-                        <form method="POST" action="booking_records_logic.php" style="display:inline;">
-                          <input type="hidden" name="booking_id" value="<?= $record['id'] ?>">
-                          <input type="hidden" name="action" value="approve">
-                          <button type="submit" class="action-btn-small approve">Approve</button>
-                        </form>
-                        <button class="action-btn-small reject" onclick="showRejectModal(<?= $record['id'] ?>)">Disapprove</button>
-                      <?php elseif ($record['status'] === 'approved'): ?>
-                        <span class="text-success">Approved</span>
-                      <?php elseif ($record['status'] === 'disapproved'): ?>
-                        <span class="text-danger">Disapproved</span>
-                      <?php else: ?>
-                        <span class="text-muted">Completed</span>
-                      <?php endif; ?>
+                    <td class="cell-actions" data-label="Action">
+                      <div class="action-group">
+                        <?php if ($record['status'] === 'pending'): ?>
+                          <form method="POST" action="booking_records_logic.php">
+                            <input type="hidden" name="booking_id" value="<?= $record['id'] ?>">
+                            <input type="hidden" name="action" value="approve">
+                            <button type="submit" class="action-btn-small approve">Approve</button>
+                          </form>
+                          <button class="action-btn-small reject" onclick="showRejectModal(<?= $record['id'] ?>)">Disapprove</button>
+                        <?php elseif ($record['status'] === 'approved'): ?>
+                          <span class="text-success">Approved</span>
+                        <?php elseif ($record['status'] === 'disapproved'): ?>
+                          <span class="text-danger">Disapproved</span>
+                        <?php else: ?>
+                          <span class="text-muted">Completed</span>
+                        <?php endif; ?>
+                      </div>
                     </td>
                   </tr>
                 <?php endforeach; ?>
               <?php endif; ?>
             </tbody>
           </table>
+        </div>
+
+        <!-- Mobile-only booking cards: same $records data, same status
+             logic as the table above, just a different markup shape for
+             screens 767px and below. Desktop table above is untouched. -->
+        <div class="booking-cards only-mobile">
+          <?php if (empty($records)): ?>
+            <p class="empty-state">No booking records found.</p>
+          <?php else: ?>
+            <?php foreach ($records as $record): ?>
+              <div class="booking-card">
+                <div class="booking-card-header">Booking #<?= $record['id'] ?></div>
+                <div class="booking-card-body">
+                  <div class="booking-card-row">
+                    <span class="label">Renter</span>
+                    <span class="value"><?= clean($record['renter_name']) ?></span>
+                  </div>
+                  <div class="booking-card-row">
+                    <span class="label">Owner</span>
+                    <span class="value"><?= clean($record['owner_name']) ?></span>
+                  </div>
+                  <div class="booking-card-row">
+                    <span class="label">Vehicle</span>
+                    <span class="value"><?= clean($record['vehicle_name']) ?></span>
+                  </div>
+                  <div class="booking-card-row">
+                    <span class="label">Pickup</span>
+                    <span class="value"><?= formatDate($record['start_date']) ?></span>
+                  </div>
+                  <div class="booking-card-row">
+                    <span class="label">Return</span>
+                    <span class="value"><?= formatDate($record['end_date']) ?></span>
+                  </div>
+                  <div class="booking-card-row">
+                    <span class="label">Amount</span>
+                    <span class="value">$<?= number_format($record['total_price'], 2) ?></span>
+                  </div>
+                  <div class="booking-card-row">
+                    <span class="label">Status</span>
+                    <span class="value">
+                      <span class="status-badge <?= statusBadgeClass($record['status']) ?>">
+                        <?= statusLabel($record['status']) ?>
+                      </span>
+                    </span>
+                  </div>
+                </div>
+                <div class="booking-card-actions">
+                  <?php if ($record['status'] === 'pending'): ?>
+                    <form method="POST" action="booking_records_logic.php">
+                      <input type="hidden" name="booking_id" value="<?= $record['id'] ?>">
+                      <input type="hidden" name="action" value="approve">
+                      <button type="submit" class="action-btn-small approve">Approve</button>
+                    </form>
+                    <button class="action-btn-small reject" onclick="showRejectModal(<?= $record['id'] ?>)">Disapprove</button>
+                  <?php elseif ($record['status'] === 'approved'): ?>
+                    <span class="text-success">Approved</span>
+                  <?php elseif ($record['status'] === 'disapproved'): ?>
+                    <span class="text-danger">Disapproved</span>
+                  <?php else: ?>
+                    <span class="text-muted">Completed</span>
+                  <?php endif; ?>
+                </div>
+              </div>
+            <?php endforeach; ?>
+          <?php endif; ?>
         </div>
       </section>
     </main>
@@ -177,6 +277,30 @@
         });
       });
     });
+
+    (function () {
+      const liveTargets = document.querySelectorAll('[data-live-refresh]');
+      liveTargets.forEach(function (node) {
+        const refreshUrl = node.dataset.liveRefresh;
+        const targetSelector = node.dataset.liveTarget || '#' + node.id;
+        const refreshSection = function () {
+          fetch(refreshUrl)
+            .then(function (response) { return response.text(); })
+            .then(function (html) {
+              const targetNode = document.querySelector(targetSelector);
+              if (targetNode) {
+                targetNode.innerHTML = html;
+              }
+            })
+            .catch(function (error) {
+              console.log('Booking records live refresh failed:', error);
+            });
+        };
+
+        refreshSection();
+        setInterval(refreshSection, 8000);
+      });
+    })();
 
     // Reject modal functions
     function showRejectModal(bookingId) {

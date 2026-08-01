@@ -19,6 +19,24 @@ if (function_exists('enforce_owner_access')) {
 }
 
 $bookings = get_owner_bookings($pdo, $owner['id']);
+
+$ajax = isset($_GET['ajax']) && $_GET['ajax'] === '1';
+if ($ajax && ($_GET['section'] ?? '') === 'booking-requests') {
+    if (empty($bookings)) {
+        echo '<tr><td colspan="5" class="empty-state">No booking requests found.</td></tr>';
+    } else {
+        foreach ($bookings as $booking) {
+            echo '<tr>';
+            echo '<td data-label="Vehicle">' . htmlspecialchars($booking['vehicle_name']) . '</td>';
+            echo '<td data-label="Renter">' . htmlspecialchars($booking['renter_name']) . '</td>';
+            echo '<td data-label="Dates">' . format_date($booking['start_date']) . ' - ' . format_date($booking['end_date']) . '</td>';
+            echo '<td data-label="Price">' . format_currency($booking['total_price']) . '</td>';
+            echo '<td data-label="Status"><span class="status-badge ' . htmlspecialchars(status_badge_class($booking['status'])) . '">' . htmlspecialchars(status_label($booking['status'])) . '</span></td>';
+            echo '</tr>';
+        }
+    }
+    exit;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -63,33 +81,58 @@ $bookings = get_owner_bookings($pdo, $owner['id']);
         <?php if (empty($bookings)) : ?>
           <p class="empty-state">No booking requests found.</p>
         <?php else : ?>
-          <table class="table">
-            <thead>
-              <tr>
-                <th>Vehicle</th>
-                <th>Renter</th>
-                <th>Dates</th>
-                <th>Price</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              <?php foreach ($bookings as $booking) : ?>
+          <div class="table-wrapper">
+            <table class="table">
+              <thead>
                 <tr>
-                  <td><?php echo htmlspecialchars($booking['vehicle_name']); ?></td>
-                  <td><?php echo htmlspecialchars($booking['renter_name']); ?></td>
-                  <td><?php echo format_date($booking['start_date']); ?> - <?php echo format_date($booking['end_date']); ?></td>
-                  <td><?php echo format_currency($booking['total_price']); ?></td>
-                  <td><span class="status-badge <?php echo htmlspecialchars(status_badge_class($booking['status'])); ?>"><?php echo htmlspecialchars(status_label($booking['status'])); ?></span></td>
+                  <th>Vehicle</th>
+                  <th>Renter</th>
+                  <th>Dates</th>
+                  <th>Price</th>
+                  <th>Status</th>
                 </tr>
-              <?php endforeach; ?>
-            </tbody>
-          </table>
+              </thead>
+              <tbody id="owner-booking-list" data-live-refresh="booking_requests.php?ajax=1&section=booking-requests" data-live-target="tbody#owner-booking-list">
+                <?php foreach ($bookings as $booking) : ?>
+                  <tr>
+                    <td data-label="Vehicle"><?php echo htmlspecialchars($booking['vehicle_name']); ?></td>
+                    <td data-label="Renter"><?php echo htmlspecialchars($booking['renter_name']); ?></td>
+                    <td data-label="Dates"><?php echo format_date($booking['start_date']); ?> - <?php echo format_date($booking['end_date']); ?></td>
+                    <td data-label="Price"><?php echo format_currency($booking['total_price']); ?></td>
+                    <td data-label="Status"><span class="status-badge <?php echo htmlspecialchars(status_badge_class($booking['status'])); ?>"><?php echo htmlspecialchars(status_label($booking['status'])); ?></span></td>
+                  </tr>
+                <?php endforeach; ?>
+              </tbody>
+            </table>
+          </div>
         <?php endif; ?>
       </section>
     </main>
   </div>
 
   <script src="js/owner_script.js"></script>
+  <script>
+    (function () {
+      const tableBody = document.getElementById('owner-booking-list');
+      if (!tableBody || !tableBody.dataset.liveRefresh) return;
+
+      const refreshUrl = tableBody.dataset.liveRefresh;
+      const target = tableBody.dataset.liveTarget || '#owner-booking-list';
+      const refreshSection = () => {
+        fetch(refreshUrl)
+          .then((response) => response.text())
+          .then((html) => {
+            const targetNode = document.querySelector(target);
+            if (targetNode) {
+              targetNode.innerHTML = html;
+            }
+          })
+          .catch((error) => console.log('Booking list refresh failed:', error));
+      };
+
+      refreshSection();
+      setInterval(refreshSection, 7000);
+    })();
+  </script>
 </body>
 </html>

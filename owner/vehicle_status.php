@@ -34,6 +34,30 @@ foreach ($vehicles as $vehicle) {
         }
     }
 }
+
+$ajax = isset($_GET['ajax']) && $_GET['ajax'] === '1';
+if ($ajax && ($_GET['section'] ?? '') === 'vehicle-status') {
+    echo '<section class="content-grid" id="owner-vehicle-status-summary">';
+    echo '<div class="card"><h3 class="section-title">Available Now</h3><p>' . (int) $available . ' vehicle(s)</p></div>';
+    echo '<div class="card"><h3 class="section-title">In Use</h3><p>' . (int) $rented . ' vehicle(s)</p></div>';
+    echo '<div class="card"><h3 class="section-title">Maintenance</h3><p>' . (int) $maintenance . ' vehicle(s)</p></div>';
+    echo '</section>';
+    if (!empty($maintenance_vehicles)) {
+        echo '<section class="card" style="margin-top:20px;" id="owner-maintenance-list">';
+        echo '<h3 class="section-title">Vehicles Under Maintenance</h3>';
+        echo '<div class="table-wrapper"><table class="table"><thead><tr><th>Vehicle</th><th>Category</th><th>Price</th><th>Status</th></tr></thead><tbody>';
+        foreach ($maintenance_vehicles as $vehicle) {
+            echo '<tr>';
+            echo '<td data-label="Vehicle">' . htmlspecialchars($vehicle['name']) . '</td>';
+            echo '<td data-label="Category">' . htmlspecialchars(str_replace('_', ' ', $vehicle['category'])) . '</td>';
+            echo '<td data-label="Price">' . format_currency($vehicle['price_per_day']) . '/day</td>';
+            echo '<td data-label="Status"><span class="status-badge pending">' . htmlspecialchars(status_label($vehicle['availability_status'])) . '</span></td>';
+            echo '</tr>';
+        }
+        echo '</tbody></table></div></section>';
+    }
+    exit;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -73,7 +97,7 @@ foreach ($vehicles as $vehicle) {
     </header>
 
     <main class="page">
-      <section class="content-grid">
+      <section class="content-grid" id="owner-vehicle-status-summary" data-live-refresh="vehicle_status.php?ajax=1&section=vehicle-status" data-live-target="#owner-vehicle-status-summary">
         <div class="card">
           <h3 class="section-title">Available Now</h3>
           <p><?php echo $available; ?> vehicle(s)</p>
@@ -89,7 +113,7 @@ foreach ($vehicles as $vehicle) {
       </section>
 
       <?php if (!empty($maintenance_vehicles)): ?>
-      <section class="card" style="margin-top:20px;">
+      <section class="card" style="margin-top:20px;" id="owner-maintenance-list">
         <h3 class="section-title">Vehicles Under Maintenance</h3>
         <div class="table-wrapper">
           <table class="table">
@@ -104,10 +128,10 @@ foreach ($vehicles as $vehicle) {
             <tbody>
               <?php foreach ($maintenance_vehicles as $vehicle): ?>
                 <tr>
-                  <td><?php echo htmlspecialchars($vehicle['name']); ?></td>
-                  <td><?php echo htmlspecialchars(str_replace('_', ' ', $vehicle['category'])); ?></td>
-                  <td><?php echo format_currency($vehicle['price_per_day']); ?>/day</td>
-                  <td><span class="status-badge pending"><?php echo htmlspecialchars(status_label($vehicle['availability_status'])); ?></span></td>
+                  <td data-label="Vehicle"><?php echo htmlspecialchars($vehicle['name']); ?></td>
+                  <td data-label="Category"><?php echo htmlspecialchars(str_replace('_', ' ', $vehicle['category'])); ?></td>
+                  <td data-label="Price"><?php echo format_currency($vehicle['price_per_day']); ?>/day</td>
+                  <td data-label="Status"><span class="status-badge pending"><?php echo htmlspecialchars(status_label($vehicle['availability_status'])); ?></span></td>
                 </tr>
               <?php endforeach; ?>
             </tbody>
@@ -118,5 +142,26 @@ foreach ($vehicles as $vehicle) {
     </main>
   </div>
 
+  <script>
+    (function () {
+      const summaryNode = document.getElementById('owner-vehicle-status-summary');
+      if (summaryNode && summaryNode.dataset.liveRefresh) {
+        const refreshUrl = summaryNode.dataset.liveRefresh;
+        const refreshSection = function () {
+          fetch(refreshUrl)
+            .then((response) => response.text())
+            .then((html) => {
+              const container = document.getElementById('owner-vehicle-status-summary');
+              if (container) {
+                container.innerHTML = html;
+              }
+            })
+            .catch((error) => console.log('Vehicle status summary refresh failed:', error));
+        };
+        refreshSection();
+        setInterval(refreshSection, 7000);
+      }
+    })();
+  </script>
   <script src="js/owner_script.js"></script>
 </body>

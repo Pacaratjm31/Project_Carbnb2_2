@@ -1,13 +1,3 @@
-/* =====================================================
-   Carbnb Admin Panel
-   Backup styles - Additional overrides and compatibility
-   ===================================================== */
-
-/* Profile-specific style overrides for view_profile.php */
-/* These styles differ from the main admin_style.css and are kept for compatibility */
-
-/* Note: .status-badge styles are now in admin_style.css */
-/* This file only contains overrides that differ from the main styles */
 
 .info-label {
     color: #888;
@@ -20,4 +10,331 @@
     font-size: 1.2rem;
     margin-bottom: 20px;
     color: #eee;
+}
+
+.table-wrapper {
+  width: 100%;
+  max-width: 100%;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  -webkit-overflow-scrolling: touch; /* smooth momentum scroll on iOS */
+}
+
+.table-wrapper .table {
+  border-radius: 12px;
+  overflow: hidden; /* keeps corners clean, no broken borders on scroll */
+}
+
+@media (max-width: 992px) {
+  .table th,
+  .table td {
+    padding: 12px 10px;
+  }
+}
+
+@media (max-width: 768px) {
+  .table th,
+  .table td {
+    padding: 10px 8px;
+    font-size: 0.88rem;
+    white-space: nowrap; /* keeps columns compact; wrapper scrolls instead of squashing text */
+  }
+
+  /* Long content wraps instead of forcing the whole table wider */
+  .cell-name,
+  .cell-email,
+  .cell-message {
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    max-width: 220px;
+  }
+
+  /* Let the table grow past 100% only inside the wrapper,
+     which is what actually creates the inner scrollbar */
+  .table {
+    width: max-content;
+    min-width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .table-wrapper {
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    background: linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+  }
+
+  .table-wrapper .table {
+    width: 100%;
+    min-width: 0;
+    display: block;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  .table-wrapper .table thead {
+    display: none;
+  }
+
+  .table-wrapper .table tbody {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .table-wrapper .table tbody tr {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px;
+    margin: 0;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+    box-shadow: var(--shadow);
+  }
+
+  .table-wrapper .table td[data-label] {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    padding: 0;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    font-size: 0.86rem;
+    color: var(--text);
+  }
+
+  .table-wrapper .table td[data-label]:last-child {
+    border-bottom: none;
+  }
+
+  .table-wrapper .table td[data-label]::before {
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 0.7rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    content: attr(data-label);
+    flex: 0 0 110px;
+  }
+
+  .table-wrapper .table td[data-label] > * {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .table-wrapper .table td.cell-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    padding-top: 12px;
+  }
+
+  .table-wrapper .table td.cell-actions::before {
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .table-wrapper .table td.cell-actions .action-group {
+    width: 100%;
+  }
+
+  .table-wrapper .table td.cell-actions .action-group > * {
+    width: 100%;
+  }
+
+  .table-wrapper .table td.cell-actions .action-group form {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .table th,
+  .table td {
+    padding: 6px 5px;
+    font-size: 0.78rem;
+  }
+
+  .status-badge {
+    padding: 4px 8px;
+    font-size: 0.78rem;
+  }
+
+  .alert {
+    font-size: 0.88rem;
+    padding: 8px 10px;
+  }
+
+  .empty-state,
+  .text-muted {
+    font-size: 0.85rem;
+  }
+}
+
+@media (max-width: 992px) {
+  .action-group {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 768px) {
+  .action-group {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .action-group > form,
+  .action-group > a,
+  .action-group > button {
+    width: 100%;
+  }
+
+  button,
+  .action-btn-small,
+  .btn-primary,
+  .action-btn,
+  .topbar-action {
+    min-height: 44px;
+    padding: 10px 14px;
+    white-space: normal;
+    text-align: center;
+  }
+}
+
+@media (max-width: 480px) {
+  button,
+  .action-btn-small,
+  .btn-primary {
+    font-size: 0.85rem;
+    padding: 9px 12px;
+  }
+}
+
+@media (max-width: 576px) {
+  /* .form-grid-2 also carries an inline
+     grid-template-columns style in the HTML, which beats
+     a plain class rule — !important is required here to
+     actually collapse it to one column on phones. */
+  .form-grid-2 {
+    grid-template-columns: 1fr !important;
+  }
+
+  input,
+  select,
+  textarea,
+  .form-control {
+    width: 100%;
+  }
+}
+
+
+.modal,
+.doc-modal {
+  padding: 16px;
+}
+
+.modal-content,
+.doc-modal-content {
+  max-height: 88vh;
+  overflow-y: auto;
+  border-radius: 14px;
+}
+
+@media (max-width: 576px) {
+  .modal-content,
+  .doc-modal-content {
+    width: 92%;
+    max-width: 400px;
+    margin: 20px auto;
+    padding: 16px;
+  }
+
+  .modal-content textarea,
+  .modal-content input,
+  .modal-content select {
+    width: 100%;
+  }
+
+  .doc-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 10px;
+  }
+}
+
+
+.vehicle-image,
+.doc-item img,
+.doc-item video,
+.face-preview img {
+  max-width: 100%;
+}
+
+@media (max-width: 992px) {
+  .vehicle-card {
+    gap: 14px;
+    padding: 14px;
+  }
+}
+
+@media (max-width: 768px) {
+  .vehicle-card {
+    grid-template-columns: 1fr;
+  }
+
+  .vehicle-image {
+    aspect-ratio: 16/9;
+  }
+}
+
+@media (max-width: 576px) {
+  .vehicle-details h3 {
+    font-size: 18px;
+  }
+
+  .info-table th {
+    width: 110px;
+    font-size: 13px;
+  }
+
+  .info-table td {
+    font-size: 13px;
+  }
+
+  .vehicle-actions {
+    flex-direction: column;
+  }
+
+  .vehicle-actions .action-btn-small {
+    width: 100%;
+  }
+}
+
+@media (max-width: 576px) {
+  /* .receipt-thumb also carries inline max-width/max-height
+     in the HTML, so !important is needed to size it down
+     further on small phones. */
+  .receipt-thumb {
+    max-width: 48px !important;
+    max-height: 48px !important;
+  }
+}
+
+
+.card canvas {
+  width: 100% !important;
+  max-width: 100%;
+}
+
+@media (max-width: 576px) {
+  .card canvas {
+    max-height: 220px !important;
+  }
 }

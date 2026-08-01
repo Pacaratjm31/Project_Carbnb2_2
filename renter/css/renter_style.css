@@ -954,3 +954,86 @@ button:hover {
         width: 100%;
     }
 }
+
+/* ===== Mobile Dropdown Nav (<=768px only) ===== */
+/* Desktop nav above (.top-nav, .nav-right, and their colors/spacing) is  */
+/* completely untouched outside this media query. On mobile the menu     */
+/* button toggles the "active" class via JS; the dropdown sits in normal */
+/* document flow (no position:absolute / overlay / sidebar), so it      */
+/* pushes the rest of the page content downward naturally.               */
+
+.nav-toggle {
+    display: none; /* hidden on desktop */
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: #28a745;
+    border: 2px solid #28a745;
+    color: #fff;
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1;
+    padding: 10px 18px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.nav-toggle:hover,
+.nav-toggle.active {
+    background: #1e7e34;
+    border-color: #1e7e34;
+}
+
+.nav-toggle .nav-toggle-icon {
+    width: 18px !important;
+    height: 18px !important;
+    max-width: 18px !important;
+    max-height: 18px !important;
+    flex-shrink: 0;
+    display: inline-block;
+    object-fit: contain;
+}
+
+.nav-toggle-text {
+    line-height: 1;
+    white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+    .top-nav {
+        position: static; /* let the nav flow with the page on mobile */
+        flex-direction: column;
+        align-items: flex-start;
+        padding: 15px 20px;
+        gap: 10px;
+    }
+
+    .header-text {
+        margin-top: 20px; /* nav is no longer fixed, so drop the desktop offset */
+    }
+
+    .nav-toggle {
+        display: inline-flex;
+        width: auto;
+        align-self: flex-start;
+    }
+
+    .nav-right {
+        display: none;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+        width: 100%;
+    }
+
+    .nav-right.active {
+        display: flex;
+    }
+
+    .nav-right a,
+    .nav-right .nav-link {
+        width: 100%;
+        text-align: center;
+    }
+}

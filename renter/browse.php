@@ -132,6 +132,40 @@ function build_vehicle_image_path($value): string {
 
     return '../uploads/vehicles/' . basename($value);
 }
+
+$ajax = isset($_GET['ajax']) && $_GET['ajax'] === '1';
+if ($ajax && ($_GET['section'] ?? '') === 'car-container') {
+    if (empty($cars)) {
+        echo '<p class="empty-state">No approved vehicles found.</p>';
+    } else {
+        foreach ($cars as $car) {
+            $carImage = build_vehicle_image_path($car['car_image'] ?? '');
+            $approval = $car['approval_status'] ?? 'pending';
+            $statusClass = $approval === 'approved' ? 'available' : 'pending';
+            $statusLabel = $approval === 'approved' ? 'Available' : ucfirst($approval);
+            echo '<div class="car-card">';
+            echo '<img src="' . htmlspecialchars($carImage) . '" alt="' . htmlspecialchars($car['vehicle_name']) . '" class="car-image">';
+            echo '<div class="car-details">';
+            echo '<div class="car-header"><h3>' . htmlspecialchars($car['vehicle_name']) . '</h3><span class="status-badge ' . htmlspecialchars($statusClass) . '">' . htmlspecialchars($statusLabel) . '</span></div>';
+            echo '<p><strong>Owner:</strong> ' . htmlspecialchars($car['owner_name']) . '</p>';
+            echo '<p><strong>Category:</strong> ' . htmlspecialchars(ucfirst(str_replace('_', ' ', $car['category']))) . '</p>';
+            echo '<p><strong>Rate:</strong> ₱' . number_format((float) $car['rate'], 2) . '/day</p>';
+            echo '<p><strong>Availability:</strong> ' . htmlspecialchars($car['status']) . '</p>';
+            if ($approval === 'approved') {
+                echo '<a href="vehicle_details.php?vehicle_id=' . (int) $car['id'] . '" class="book-btn">View Details</a>';
+                if ($account_state['restricted']) {
+                    echo '<button class="book-btn disabled" disabled>Booking Pending</button>';
+                } else {
+                    echo '<a href="book.php?vehicle_id=' . (int) $car['id'] . '" class="book-btn">Book Now</a>';
+                }
+            } else {
+                echo '<button class="book-btn disabled" disabled>Unavailable</button>';
+            }
+            echo '</div></div>';
+        }
+    }
+    exit;
+}
 ?>
 
 <!DOCTYPE html>
@@ -141,8 +175,8 @@ function build_vehicle_image_path($value): string {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Browse Cars | Carbnb</title>
 <link rel="stylesheet" href="../bootstrap-5.3.8-dist/css/bootstrap.min.css">
-<link rel="stylesheet" href="css/renter_style.css?v=4">
-<link rel="stylesheet" href="css/renter_style_backup.css?v=4">
+<link rel="stylesheet" href="css/renter_style.css?v=6">
+<link rel="stylesheet" href="css/renter_style_backup.css?v=6">
 </head>
 <body data-user-id="<?php echo (int) $user_id; ?>" data-current-status="<?php echo htmlspecialchars($renter['status'] ?? 'pending'); ?>">
 
@@ -151,19 +185,24 @@ function build_vehicle_image_path($value): string {
         <h2>Carbnb</h2>
     </div>
 
-        <div class="nav-right">
-            <a href="browse.php" class="active nav-all-cars">All Cars</a>
-            <?php if ($account_state['restricted']): ?>
-                <span class="nav-link disabled-link">My Records</span>
-                <span class="nav-link disabled-link">My Profile</span>
-                <span class="nav-link disabled-link">Messages</span>
-            <?php else: ?>
-                <a href="record.php" class="nav-my-records">My Records</a>
-                <a href="view_profile.php" class="nav-my-profile">My Profile</a>
-                <a href="renter_messages.php" class="nav-my-messages">Messages</a>
-            <?php endif; ?>
-            <a href="../auth/logout.php" class="logout-link">Logout</a>
-        </div>
+    <button type="button" class="nav-toggle" id="navToggleBtn" aria-label="Toggle navigation menu" aria-expanded="false" aria-controls="navRightMenu">
+        <img src="../image/hamburger_menu.png" alt="" class="nav-toggle-icon">
+        <span class="nav-toggle-text">Menu</span>
+    </button>
+
+    <div class="nav-right" id="navRightMenu">
+        <a href="browse.php" class="active nav-all-cars">All Cars</a>
+        <?php if ($account_state['restricted']): ?>
+            <span class="nav-link disabled-link">My Records</span>
+            <span class="nav-link disabled-link">My Profile</span>
+            <span class="nav-link disabled-link">Messages</span>
+        <?php else: ?>
+            <a href="record.php" class="nav-my-records">My Records</a>
+            <a href="view_profile.php" class="nav-my-profile">My Profile</a>
+            <a href="renter_messages.php" class="nav-my-messages">Messages</a>
+        <?php endif; ?>
+        <a href="../auth/logout.php" class="logout-link">Logout</a>
+    </div>
 </div>
 
 <div class="header-text">
@@ -211,7 +250,7 @@ function build_vehicle_image_path($value): string {
     <a href="browse.php?seater=10+">10+ Seater</a>
 </div>
 
-<div class="car-container">
+<div class="car-container" id="renter-car-container" data-live-refresh="browse.php?ajax=1&section=car-container" data-live-target="#renter-car-container">
 
 <?php if (empty($cars)): ?>
     <div class="no-results">
@@ -329,41 +368,82 @@ function build_vehicle_image_path($value): string {
 </footer>
 
 <script>
-// Auto-refresh approval status for pending accounts
-(function() {
+(function () {
     const userId = document.body.getAttribute('data-user-id');
     const currentStatus = document.body.getAttribute('data-current-status');
     const statusBadge = document.getElementById('renter-approval-status');
     const approvalNote = document.getElementById('renter-approval-note');
     const approvalBannerBadge = document.getElementById('renter-approval-badge');
-    
-    if (!userId || !statusBadge) return;
-    
-    // Only poll if account is pending
-    if (currentStatus !== 'pending') return;
-    
-    // Poll for status updates every 5 seconds
-    const pollInterval = setInterval(function() {
-        fetch('check_approval_status.php?user_id=' + userId)
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'approved') {
-                    clearInterval(pollInterval);
-                    location.reload();
-                } else if (data.status === 'disapproved') {
-                    statusBadge.textContent = 'Disapproved';
-                    statusBadge.className = 'status-badge disapproved';
-                    approvalNote.textContent = data.disapproval_reason || 'Your account was disapproved.';
-                    if (approvalBannerBadge) {
-                        approvalBannerBadge.textContent = 'Disapproved';
-                        approvalBannerBadge.className = 'status-badge disapproved';
+    const liveContainer = document.getElementById('renter-car-container');
+
+    if (userId && statusBadge && currentStatus === 'pending') {
+        const pollInterval = setInterval(function () {
+            fetch('check_approval_status.php?user_id=' + userId)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'approved') {
+                        clearInterval(pollInterval);
+                        statusBadge.textContent = 'Approved';
+                        statusBadge.className = 'status-badge approved';
+                        approvalNote.textContent = 'Your renter account has been approved by admin. Full access is enabled.';
+                        if (approvalBannerBadge) {
+                            approvalBannerBadge.textContent = 'Approved';
+                            approvalBannerBadge.className = 'status-badge approved';
+                        }
+                    } else if (data.status === 'disapproved') {
+                        statusBadge.textContent = 'Disapproved';
+                        statusBadge.className = 'status-badge disapproved';
+                        approvalNote.textContent = data.disapproval_reason || 'Your account was disapproved.';
+                        if (approvalBannerBadge) {
+                            approvalBannerBadge.textContent = 'Disapproved';
+                            approvalBannerBadge.className = 'status-badge disapproved';
+                        }
                     }
-                }
-            })
-            .catch(err => console.log('Status check failed:', err));
-    }, 5000);
+                })
+                .catch(err => console.log('Status check failed:', err));
+        }, 5000);
+    }
+
+    if (liveContainer && liveContainer.dataset.liveRefresh) {
+        const refreshUrl = liveContainer.dataset.liveRefresh;
+        const refreshTarget = liveContainer.dataset.liveTarget || '#renter-car-container';
+        const refreshSection = function () {
+            fetch(refreshUrl)
+                .then(response => response.text())
+                .then(html => {
+                    const targetNode = document.querySelector(refreshTarget);
+                    if (targetNode) {
+                        targetNode.innerHTML = html;
+                    }
+                })
+                .catch(error => console.log('Browse refresh failed:', error));
+        };
+
+        refreshSection();
+        setInterval(refreshSection, 8000);
+    }
 })();
 </script>
+
+<script>
+// Mobile dropdown navigation menu (only affects <=768px via CSS)
+// Tapping the Menu button toggles the 'active' class, which shows/hides
+// the nav links as a normal in-flow dropdown (pushes content down).
+// Tapping the Menu button again hides it.
+(function() {
+    const toggleBtn = document.getElementById('navToggleBtn');
+    const navMenu = document.getElementById('navRightMenu');
+
+    if (!toggleBtn || !navMenu) return;
+
+    toggleBtn.addEventListener('click', function() {
+        const isActive = navMenu.classList.toggle('active');
+        toggleBtn.classList.toggle('active', isActive);
+        toggleBtn.setAttribute('aria-expanded', isActive ? 'true' : 'false');
+    });
+})();
+</script>
+
 <script src="../bootstrap-5.3.8-dist/js/bootstrap.bundle.min.js"></script>
 
 </body>

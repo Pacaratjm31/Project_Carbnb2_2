@@ -18,6 +18,24 @@ if (function_exists('enforce_owner_access')) {
     exit();
 }
 $history = get_owner_history($pdo, $owner['id']);
+
+$ajax = isset($_GET['ajax']) && $_GET['ajax'] === '1';
+if ($ajax && ($_GET['section'] ?? '') === 'rental-history') {
+    if (empty($history)) {
+        echo '<tr><td colspan="5" class="empty-state">No booking history found.</td></tr>';
+    } else {
+        foreach ($history as $item) {
+            echo '<tr>';
+            echo '<td data-label="Vehicle">' . htmlspecialchars($item['vehicle_name']) . '</td>';
+            echo '<td data-label="Renter">' . htmlspecialchars($item['renter_name']) . '</td>';
+            echo '<td data-label="Dates">' . format_date($item['start_date']) . ' - ' . format_date($item['end_date']) . '</td>';
+            echo '<td data-label="Price">' . format_currency($item['total_price']) . '</td>';
+            echo '<td data-label="Status"><span class="status-badge ' . htmlspecialchars(status_badge_class($item['status'])) . '">' . htmlspecialchars(status_label($item['status'])) . '</span></td>';
+            echo '</tr>';
+        }
+    }
+    exit;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -62,33 +80,58 @@ $history = get_owner_history($pdo, $owner['id']);
         <?php if (empty($history)) : ?>
           <p class="empty-state">No booking history found.</p>
         <?php else : ?>
-          <table class="table">
-            <thead>
-              <tr>
-                <th>Vehicle</th>
-                <th>Renter</th>
-                <th>Dates</th>
-                <th>Price</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              <?php foreach ($history as $item) : ?>
+          <div class="table-wrapper">
+            <table class="table">
+              <thead>
                 <tr>
-                  <td><?php echo htmlspecialchars($item['vehicle_name']); ?></td>
-                  <td><?php echo htmlspecialchars($item['renter_name']); ?></td>
-                  <td><?php echo format_date($item['start_date']); ?> - <?php echo format_date($item['end_date']); ?></td>
-                  <td><?php echo format_currency($item['total_price']); ?></td>
-                  <td><span class="status-badge <?php echo htmlspecialchars(status_badge_class($item['status'])); ?>"><?php echo htmlspecialchars(status_label($item['status'])); ?></span></td>
+                  <th>Vehicle</th>
+                  <th>Renter</th>
+                  <th>Dates</th>
+                  <th>Price</th>
+                  <th>Status</th>
                 </tr>
-              <?php endforeach; ?>
-            </tbody>
-          </table>
+              </thead>
+              <tbody id="owner-rental-history" data-live-refresh="rental_history.php?ajax=1&section=rental-history" data-live-target="tbody#owner-rental-history">
+                <?php foreach ($history as $item) : ?>
+                  <tr>
+                    <td data-label="Vehicle"><?php echo htmlspecialchars($item['vehicle_name']); ?></td>
+                    <td data-label="Renter"><?php echo htmlspecialchars($item['renter_name']); ?></td>
+                    <td data-label="Dates"><?php echo format_date($item['start_date']); ?> - <?php echo format_date($item['end_date']); ?></td>
+                    <td data-label="Price"><?php echo format_currency($item['total_price']); ?></td>
+                    <td data-label="Status"><span class="status-badge <?php echo htmlspecialchars(status_badge_class($item['status'])); ?>"><?php echo htmlspecialchars(status_label($item['status'])); ?></span></td>
+                  </tr>
+                <?php endforeach; ?>
+              </tbody>
+            </table>
+          </div>
         <?php endif; ?>
       </section>
     </main>
   </div>
 
+  <script>
+    (function () {
+      const tableBody = document.getElementById('owner-rental-history');
+      if (!tableBody || !tableBody.dataset.liveRefresh) return;
+
+      const refreshUrl = tableBody.dataset.liveRefresh;
+      const target = tableBody.dataset.liveTarget || '#owner-rental-history';
+      const refreshSection = () => {
+        fetch(refreshUrl)
+          .then((response) => response.text())
+          .then((html) => {
+            const targetNode = document.querySelector(target);
+            if (targetNode) {
+              targetNode.innerHTML = html;
+            }
+          })
+          .catch((error) => console.log('Rental history refresh failed:', error));
+      };
+
+      refreshSection();
+      setInterval(refreshSection, 7000);
+    })();
+  </script>
   <script src="js/owner_script.js"></script>
 </body>
 </html>

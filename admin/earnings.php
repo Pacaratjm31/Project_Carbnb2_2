@@ -14,6 +14,65 @@ $revenues = [];
 $chartLabels = [];
 $chartData = [];
 
+$ajax = isset($_GET['ajax']) && $_GET['ajax'] === '1';
+if ($ajax && ($_GET['section'] ?? '') === 'earnings-summary') {
+    echo '<div class="stat-box"><h3>Total Revenue (All)</h3><p>₱' . number_format($totalRevenue, 2) . '</p></div>';
+    echo '<div class="stat-box"><h3>Verified Revenue</h3><p>₱' . number_format($verifiedRevenue, 2) . '</p></div>';
+    echo '<div class="stat-box"><h3>Pending Payments</h3><p>₱' . number_format($pendingRevenue, 2) . '</p></div>';
+    echo '<div class="stat-box"><h3>Commission (20%)</h3><p>₱' . number_format($totalCommission, 2) . '</p></div>';
+    echo '<div class="stat-box"><h3>Owner Earnings (80%)</h3><p>₱' . number_format($totalOwnerIncome, 2) . '</p></div>';
+    echo '<div class="stat-box"><h3>Total Transactions</h3><p>' . $totalTransactions . '</p></div>';
+    exit;
+}
+
+if ($ajax && ($_GET['section'] ?? '') === 'pending-payments-table') {
+    if (empty($pending_payments)) {
+        echo '<tr><td colspan="8" class="empty-state">No pending payments to approve.</td></tr>';
+    } else {
+        foreach ($pending_payments as $payment) {
+            echo '<tr>';
+            echo '<td data-label="Booking ID">#' . $payment['booking_id'] . '</td>';
+            echo '<td data-label="Renter">' . clean($payment['renter_name']) . '<br><small class="cell-email">' . clean($payment['renter_email']) . '</small></td>';
+            echo '<td data-label="Owner">' . clean($payment['owner_name']) . '<br><small class="cell-email">' . clean($payment['owner_email']) . '</small></td>';
+            echo '<td data-label="Vehicle">' . clean($payment['vehicle_name']) . '</td>';
+            echo '<td data-label="Amount">₱' . number_format($payment['amount'], 2) . '</td>';
+            echo '<td data-label="Method">' . (!empty($payment['payment_method']) ? '<span class="status-badge">' . clean(strtoupper($payment['payment_method'])) . '</span>' : '<span class="text-muted">—</span>') . '</td>';
+            echo '<td data-label="Receipt / Proof">';
+            if (!empty($payment['proof_image'])) {
+                echo '<a href="../uploads/payments/' . clean($payment['proof_image']) . '" target="_blank"><img src="../uploads/payments/' . clean($payment['proof_image']) . '" class="receipt-thumb" style="max-width:60px; max-height:60px; object-fit:cover; border-radius:6px;" alt="Receipt"></a>';
+            } elseif (!empty($payment['payment_url'])) {
+                echo '<a href="' . clean($payment['payment_url']) . '" target="_blank">View Xendit Invoice</a>';
+            } else {
+                echo '<span class="text-muted">No receipt</span>';
+            }
+            echo '</td>';
+            echo '<td class="cell-actions" data-label="Actions"><div class="action-group"><form method="POST" onsubmit="return confirm(\'Approve this payment? 20% commission will be taken, 80% goes to owner.\');"><input type="hidden" name="action" value="approve"><input type="hidden" name="payment_id" value="' . $payment['payment_id'] . '"><button type="submit" class="action-btn-small approve">Approve</button></form><button type="button" class="action-btn-small reject" onclick="openDisapproveModal(' . $payment['payment_id'] . ')">Disapprove</button></div></td>';
+            echo '</tr>';
+        }
+    }
+    exit;
+}
+
+if ($ajax && ($_GET['section'] ?? '') === 'payment-history-table') {
+    if (empty($all_payments)) {
+        echo '<tr><td colspan="8" class="empty-state">No payment records found.</td></tr>';
+    } else {
+        foreach ($all_payments as $payment) {
+            echo '<tr>';
+            echo '<td data-label="Booking ID">#' . $payment['booking_id'] . '</td>';
+            echo '<td data-label="Renter">' . clean($payment['renter_name']) . '</td>';
+            echo '<td data-label="Owner">' . clean($payment['owner_name']) . '</td>';
+            echo '<td data-label="Vehicle">' . clean($payment['vehicle_name']) . '</td>';
+            echo '<td data-label="Amount">₱' . number_format($payment['amount'], 2) . '</td>';
+            echo '<td data-label="Method">' . (!empty($payment['payment_method']) ? clean(strtoupper($payment['payment_method'])) : '<span class="text-muted">—</span>') . '</td>';
+            echo '<td data-label="Status"><span class="status-badge ' . statusBadgeClass($payment['payment_status']) . '">' . statusLabel($payment['payment_status']) . '</span></td>';
+            echo '<td data-label="Date">' . formatDate($payment['payment_date']) . '</td>';
+            echo '</tr>';
+        }
+    }
+    exit;
+}
+
 // Total Revenue (All Status)
 try {
     $stmt = $pdo->query("
@@ -64,6 +123,7 @@ try {
   <title>Earnings & Commission | Carbnb Admin</title>
   <link rel="stylesheet" href="css/admin_style.css?v=20260702">
   <link rel="stylesheet" href="css/admin_style_backup.css?v=20260702">
+  <link rel="stylesheet" href="css/admin_responsive.css?v=20260801">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
@@ -115,7 +175,7 @@ try {
         </div>
       <?php endif; ?>
 
-      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px;">
+      <div id="admin-earnings-summary" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px;" data-live-refresh="earnings.php?ajax=1&section=earnings-summary" data-live-target="#admin-earnings-summary">
         <div class="stat-box">
           <h3>Total Revenue (All)</h3>
           <p>₱<?= number_format($totalRevenue, 2) ?></p>
@@ -164,7 +224,7 @@ try {
                 <th>Actions</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody id="admin-pending-payments-table" data-live-refresh="earnings.php?ajax=1&section=pending-payments-table" data-live-target="#admin-pending-payments-table">
               <?php if (empty($pending_payments)): ?>
                 <tr>
                   <td colspan="8" class="empty-state">No pending payments to approve.</td>
@@ -172,22 +232,23 @@ try {
               <?php else: ?>
                 <?php foreach ($pending_payments as $payment): ?>
                   <tr>
-                    <td>#<?= $payment['booking_id'] ?></td>
-                    <td><?= clean($payment['renter_name']) ?><br><small><?= clean($payment['renter_email']) ?></small></td>
-                    <td><?= clean($payment['owner_name']) ?><br><small><?= clean($payment['owner_email']) ?></small></td>
-                    <td><?= clean($payment['vehicle_name']) ?></td>
-                    <td>₱<?= number_format($payment['amount'], 2) ?></td>
-                    <td>
+                    <td data-label="Booking ID">#<?= $payment['booking_id'] ?></td>
+                    <td data-label="Renter"><?= clean($payment['renter_name']) ?><br><small class="cell-email"><?= clean($payment['renter_email']) ?></small></td>
+                    <td data-label="Owner"><?= clean($payment['owner_name']) ?><br><small class="cell-email"><?= clean($payment['owner_email']) ?></small></td>
+                    <td data-label="Vehicle"><?= clean($payment['vehicle_name']) ?></td>
+                    <td data-label="Amount">₱<?= number_format($payment['amount'], 2) ?></td>
+                    <td data-label="Method">
                       <?php if (!empty($payment['payment_method'])): ?>
                         <span class="status-badge"><?= clean(strtoupper($payment['payment_method'])) ?></span>
                       <?php else: ?>
                         <span class="text-muted">—</span>
                       <?php endif; ?>
                     </td>
-                    <td>
+                    <td data-label="Receipt / Proof">
                       <?php if (!empty($payment['proof_image'])): ?>
                         <a href="../uploads/payments/<?= clean($payment['proof_image']) ?>" target="_blank">
                           <img src="../uploads/payments/<?= clean($payment['proof_image']) ?>" 
+                               class="receipt-thumb"
                                style="max-width:60px; max-height:60px; object-fit:cover; border-radius:6px;" 
                                alt="Receipt">
                         </a>
@@ -199,9 +260,9 @@ try {
                         <span class="text-muted">No receipt</span>
                       <?php endif; ?>
                     </td>
-                    <td>
+                    <td class="cell-actions" data-label="Actions">
                       <div class="action-group">
-                        <form method="POST" style="display:inline;" onsubmit="return confirm('Approve this payment? 20% commission will be taken, 80% goes to owner.');">
+                        <form method="POST" onsubmit="return confirm('Approve this payment? 20% commission will be taken, 80% goes to owner.');">
                           <input type="hidden" name="action" value="approve">
                           <input type="hidden" name="payment_id" value="<?= $payment['payment_id'] ?>">
                           <button type="submit" class="action-btn-small approve">Approve</button>
@@ -235,7 +296,7 @@ try {
                 <th>Date</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody id="admin-payment-history-table" data-live-refresh="earnings.php?ajax=1&section=payment-history-table" data-live-target="#admin-payment-history-table">
               <?php if (empty($all_payments)): ?>
                 <tr>
                   <td colspan="8" class="empty-state">No payment records found.</td>
@@ -243,24 +304,24 @@ try {
               <?php else: ?>
                 <?php foreach ($all_payments as $payment): ?>
                   <tr>
-                    <td>#<?= $payment['booking_id'] ?></td>
-                    <td><?= clean($payment['renter_name']) ?></td>
-                    <td><?= clean($payment['owner_name']) ?></td>
-                    <td><?= clean($payment['vehicle_name']) ?></td>
-                    <td>₱<?= number_format($payment['amount'], 2) ?></td>
-                    <td>
+                    <td data-label="Booking ID">#<?= $payment['booking_id'] ?></td>
+                    <td data-label="Renter"><?= clean($payment['renter_name']) ?></td>
+                    <td data-label="Owner"><?= clean($payment['owner_name']) ?></td>
+                    <td data-label="Vehicle"><?= clean($payment['vehicle_name']) ?></td>
+                    <td data-label="Amount">₱<?= number_format($payment['amount'], 2) ?></td>
+                    <td data-label="Method">
                       <?php if (!empty($payment['payment_method'])): ?>
                         <?= clean(strtoupper($payment['payment_method'])) ?>
                       <?php else: ?>
                         <span class="text-muted">—</span>
                       <?php endif; ?>
                     </td>
-                    <td>
+                    <td data-label="Status">
                       <span class="status-badge <?= statusBadgeClass($payment['payment_status']) ?>">
                         <?= statusLabel($payment['payment_status']) ?>
                       </span>
                     </td>
-                    <td><?= formatDate($payment['payment_date']) ?></td>
+                    <td data-label="Date"><?= formatDate($payment['payment_date']) ?></td>
                   </tr>
                 <?php endforeach; ?>
               <?php endif; ?>
@@ -374,6 +435,30 @@ try {
         }
       }
     });
+
+    (function () {
+      const liveTargets = document.querySelectorAll('[data-live-refresh]');
+      liveTargets.forEach(function (node) {
+        const refreshUrl = node.dataset.liveRefresh;
+        const targetSelector = node.dataset.liveTarget || '#' + node.id;
+        const refreshSection = function () {
+          fetch(refreshUrl)
+            .then(function (response) { return response.text(); })
+            .then(function (html) {
+              const targetNode = document.querySelector(targetSelector);
+              if (targetNode) {
+                targetNode.innerHTML = html;
+              }
+            })
+            .catch(function (error) {
+              console.log('Earnings live refresh failed:', error);
+            });
+        };
+
+        refreshSection();
+        setInterval(refreshSection, 8000);
+      });
+    })();
   </script>
 </body>
 </html>

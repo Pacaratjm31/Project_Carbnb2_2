@@ -1,9 +1,9 @@
 <?php
 
-$host = "localhost";
-$dbname = "carbnb";
-$username = "root";
-$password = "";
+$host = "sql209.infinityfree.com";
+$dbname = "if0_42528508_carbnb"; // Replace XXX with your actual database name
+$username = "if0_42528508";
+$password = "YOUR_MYSQL_PASSWORD"; // Replace with your MySQL password
 
 function ensure_column(PDO $pdo, string $table, string $column, string $definition): void
 {
@@ -25,11 +25,9 @@ function ensure_column(PDO $pdo, string $table, string $column, string $definiti
     $stmt = $pdo->query("SHOW COLUMNS FROM `$table`");
 
     foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $col) {
-
         if (($col['Field'] ?? '') === $column) {
             return;
         }
-
     }
 
     // Add the column if it doesn't exist
@@ -42,7 +40,7 @@ function ensure_column(PDO $pdo, string $table, string $column, string $definiti
 try {
 
     $pdo = new PDO(
-        "mysql:host=$host;dbname=$dbname;charset=utf8",
+        "mysql:host=$host;dbname=$dbname;charset=utf8mb4",
         $username,
         $password
     );

@@ -84,7 +84,7 @@
     <nav>
         <h2><a href="home.php">Carbnb</a></h2>
         <div class="nav-links">
-            <a href="home.php">Home</a>
+            <a href="index.php">Home</a>
             <a href="contact.php">Contact</a>
         </div>
     </nav>

@@ -272,6 +272,73 @@ try {
 } catch (PDOException $e) {
     $error = $e->getMessage();
 }
+
+$ajax = isset($_GET['ajax']) && $_GET['ajax'] === '1';
+if ($ajax && ($_GET['section'] ?? '') === 'message-list') {
+    if (empty($messages)) {
+        echo '<div class="no-results"><h3>No messages yet.</h3><p>Messages from vehicle owners will appear here.</p></div>';
+    } else {
+        foreach ($messages as $msg) {
+            echo '<div class="record-card">';
+            echo '<div class="record-info">';
+            if ($msg['sender_id'] == $user_id) {
+                echo '<p><strong>To:</strong> ' . clean($msg['receiver_name']) . ' (' . ucfirst($msg['receiver_role']) . ')</p>';
+            } else {
+                echo '<p><strong>From:</strong> ' . clean($msg['sender_name']) . ' (' . ucfirst($msg['sender_role']) . ')</p>';
+            }
+            echo '<p><strong>Message:</strong> ' . clean($msg['message']) . '</p>';
+            echo '<p><small>' . formatDate($msg['created_at']) . '</small></p>';
+            echo '</div>';
+            echo '<div>';
+            echo '<span class="status-badge ' . ($msg['is_read'] ? 'status-approved' : 'status-pending') . '">' . ($msg['is_read'] ? 'Read' : 'New') . '</span>';
+            if ($msg['sender_id'] != $user_id && !$msg['is_read']) {
+                echo '<form method="POST" style="display:inline;">';
+                echo '<input type="hidden" name="mark_read" value="1">';
+                echo '<input type="hidden" name="message_id" value="' . $msg['id'] . '">';
+                echo '<button type="submit" class="btn-book" style="margin-top: 10px; background:#17a2b8;" onclick="return confirm(\'Mark this message as read?\')">Mark as Read</button>';
+                echo '</form>';
+            }
+            if ($msg['sender_id'] != $user_id) {
+                echo '<button type="button" class="btn-book reply-btn" style="margin-top: 10px;" data-id="' . $msg['id'] . '" data-message="' . clean($msg['message']) . '">Reply</button>';
+            }
+            echo '</div></div>';
+        }
+    }
+    exit;
+}
+
+if ($ajax && ($_GET['section'] ?? '') === 'inspection-list') {
+    if (empty($inspections)) {
+        echo '<p class="empty-state">No inspections uploaded yet.</p>';
+    } else {
+        foreach ($inspections as $inspection) {
+            echo '<div class="record-card">';
+            echo '<div class="record-info">';
+            echo '<p><strong>Vehicle:</strong> ' . clean($inspection['vehicle_name']) . '</p>';
+            echo '<p><strong>Owner:</strong> ' . clean($inspection['owner_name']) . '</p>';
+            if (!empty($inspection['reason'])) {
+                echo '<p><strong>Reason:</strong> ' . clean($inspection['reason']) . '</p>';
+            }
+            echo '<p><small>' . formatDate($inspection['created_at']) . '</small></p>';
+            echo '</div>';
+            echo '<div style="display:flex; flex-wrap:wrap; gap:10px;">';
+            if (!empty($inspection['front_image'])) {
+                echo '<a href="../' . $inspection['front_image'] . '" target="_blank" style="text-decoration:none;"><img src="../' . $inspection['front_image'] . '" style="width:60px; height:60px; object-fit:cover; border-radius:6px; border:1px solid #ffd700;"><small style="display:block; text-align:center; color:#aaa;">Front</small></a>';
+            }
+            if (!empty($inspection['back_image'])) {
+                echo '<a href="../' . $inspection['back_image'] . '" target="_blank" style="text-decoration:none;"><img src="../' . $inspection['back_image'] . '" style="width:60px; height:60px; object-fit:cover; border-radius:6px; border:1px solid #ffd700;"><small style="display:block; text-align:center; color:#aaa;">Back</small></a>';
+            }
+            if (!empty($inspection['left_image'])) {
+                echo '<a href="../' . $inspection['left_image'] . '" target="_blank" style="text-decoration:none;"><img src="../' . $inspection['left_image'] . '" style="width:60px; height:60px; object-fit:cover; border-radius:6px; border:1px solid #ffd700;"><small style="display:block; text-align:center; color:#aaa;">Left</small></a>';
+            }
+            if (!empty($inspection['right_image'])) {
+                echo '<a href="../' . $inspection['right_image'] . '" target="_blank" style="text-decoration:none;"><img src="../' . $inspection['right_image'] . '" style="width:60px; height:60px; object-fit:cover; border-radius:6px; border:1px solid #ffd700;"><small style="display:block; text-align:center; color:#aaa;">Right</small></a>';
+            }
+            echo '</div></div>';
+        }
+    }
+    exit;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -404,7 +471,7 @@ try {
                 <p>Messages from vehicle owners will appear here.</p>
             </div>
         <?php else: ?>
-            <div class="message-list">
+            <div class="message-list" id="renter-message-list" data-live-refresh="renter_messages.php?ajax=1&section=message-list" data-live-target="#renter-message-list">
                 <?php foreach ($messages as $msg): ?>
                     <div class="record-card">
                         <div class="record-info">
@@ -439,7 +506,7 @@ try {
         <!-- My Inspections Section -->
         <?php if (!empty($inspections)): ?>
             <h3 style="color:#ffd700; margin-top:30px;">My Car Inspections</h3>
-            <div class="message-list">
+            <div class="message-list" id="renter-inspection-list" data-live-refresh="renter_messages.php?ajax=1&section=inspection-list" data-live-target="#renter-inspection-list">
                 <?php foreach ($inspections as $inspection): ?>
                     <div class="record-card">
                         <div class="record-info">
@@ -533,13 +600,11 @@ try {
             var modal = document.getElementById('replyModal');
             
             if (modal) {
-                // Close modal on outside click
                 modal.addEventListener('click', function(e) {
                     if (e.target === this) closeReplyModal();
                 });
             }
-            
-            // Handle reply button clicks using data attributes
+
             document.querySelectorAll('.reply-btn').forEach(function(button) {
                 button.addEventListener('click', function() {
                     var id = this.getAttribute('data-id');
@@ -550,6 +615,30 @@ try {
                 });
             });
         });
+
+        (function () {
+            const liveTargets = document.querySelectorAll('[data-live-refresh]');
+            liveTargets.forEach(function (node) {
+                const refreshUrl = node.dataset.liveRefresh;
+                const targetSelector = node.dataset.liveTarget || '#' + node.id;
+                const refreshSection = function () {
+                    fetch(refreshUrl)
+                        .then(function (response) { return response.text(); })
+                        .then(function (html) {
+                            const targetNode = document.querySelector(targetSelector);
+                            if (targetNode) {
+                                targetNode.innerHTML = html;
+                            }
+                        })
+                        .catch(function (error) {
+                            console.log('Messages auto-refresh failed:', error);
+                        });
+                };
+
+                refreshSection();
+                setInterval(refreshSection, 8000);
+            });
+        })();
     </script>
 
     <footer>

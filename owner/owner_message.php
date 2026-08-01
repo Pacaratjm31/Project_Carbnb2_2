@@ -200,7 +200,7 @@ try {
             <table class="table">
               <thead>
                 <tr>
-<th>Renter</th>
+                  <th>Renter</th>
                   <th>Vehicle</th>
                   <th>Front Car</th>
                   <th>Back Car</th>
@@ -213,38 +213,38 @@ try {
               <tbody>
                 <?php foreach ($inspections as $inspection): ?>
                   <tr>
-                    <td><?= clean($inspection['renter_name']) ?></td>
-                    <td><?= clean($inspection['vehicle_name']) ?></td>
-                    <td>
+                    <td data-label="Renter"><?= clean($inspection['renter_name']) ?></td>
+                    <td data-label="Vehicle"><?= clean($inspection['vehicle_name']) ?></td>
+                    <td data-label="Front Car">
                       <?php if (!empty($inspection['front_image'])): ?>
                         <a href="../<?= $inspection['front_image'] ?>" target="_blank">
                           <img src="../<?= $inspection['front_image'] ?>" style="width:50px; height:50px; object-fit:cover; border-radius:4px;">
                         </a>
                       <?php else: ?> — <?php endif; ?>
                     </td>
-                    <td>
+                    <td data-label="Back Car">
                       <?php if (!empty($inspection['back_image'])): ?>
                         <a href="../<?= $inspection['back_image'] ?>" target="_blank">
                           <img src="../<?= $inspection['back_image'] ?>" style="width:50px; height:50px; object-fit:cover; border-radius:4px;">
                         </a>
                       <?php else: ?> — <?php endif; ?>
                     </td>
-                    <td>
+                    <td data-label="Left Side">
                       <?php if (!empty($inspection['left_image'])): ?>
                         <a href="../<?= $inspection['left_image'] ?>" target="_blank">
                           <img src="../<?= $inspection['left_image'] ?>" style="width:50px; height:50px; object-fit:cover; border-radius:4px;">
                         </a>
                       <?php else: ?> — <?php endif; ?>
                     </td>
-                    <td>
+                    <td data-label="Right Side">
                       <?php if (!empty($inspection['right_image'])): ?>
                         <a href="../<?= $inspection['right_image'] ?>" target="_blank">
                           <img src="../<?= $inspection['right_image'] ?>" style="width:50px; height:50px; object-fit:cover; border-radius:4px;">
                         </a>
                       <?php else: ?> — <?php endif; ?>
                     </td>
-                    <td><?= clean($inspection['reason'] ?: 'No reason provided') ?></td>
-                    <td><?= format_date($inspection['created_at']) ?></td>
+                    <td data-label="Reason for Inspection"><?= clean($inspection['reason'] ?: 'No reason provided') ?></td>
+                    <td data-label="Date"><?= format_date($inspection['created_at']) ?></td>
                   </tr>
                 <?php endforeach; ?>
               </tbody>
@@ -303,34 +303,36 @@ try {
                   <th>Action</th>
                 </tr>
               </thead>
-<tbody>
+              <tbody>
                 <?php foreach ($messages as $msg): ?>
                   <tr>
-                    <td>
+                    <td data-label="From">
                       <?php if ($msg['sender_id'] == $owner['id']): ?>
                         To: <?= clean($msg['receiver_name']) ?>
                       <?php else: ?>
                         From: <?= clean($msg['sender_name']) ?>
                       <?php endif; ?>
                     </td>
-                    <td><?= clean(substr($msg['message'], 0, 100)) ?><?= strlen($msg['message']) > 100 ? '...' : '' ?></td>
-                    <td>
+                    <td data-label="Message"><?= clean(substr($msg['message'], 0, 100)) ?><?= strlen($msg['message']) > 100 ? '...' : '' ?></td>
+                    <td data-label="Status">
                       <span class="status-badge <?= $msg['is_read'] ? 'available' : 'pending' ?>">
                         <?= $msg['is_read'] ? 'Read' : 'New' ?>
                       </span>
                     </td>
-                    <td><?= format_date($msg['created_at']) ?></td>
-                    <td>
-<?php if ($msg['sender_id'] != $owner['id'] && !$msg['is_read']): ?>
-                        <form method="POST" style="display:inline; margin-right: 5px;">
-                          <input type="hidden" name="mark_read" value="1">
-                          <input type="hidden" name="message_id" value="<?= $msg['id'] ?>">
-                          <button type="submit" class="action-btn-small approve" onclick="return confirm('Mark this message as read?')">Read</button>
-                        </form>
-                      <?php endif; ?>
-<?php if ($msg['sender_id'] != $owner['id']): ?>
-                        <button type="button" class="action-btn reply-btn" data-id="<?= $msg['id'] ?>" data-message="<?= htmlspecialchars(json_encode($msg['message']), ENT_QUOTES, 'UTF-8') ?>">Reply</button>
-                      <?php endif; ?>
+                    <td data-label="Date"><?= format_date($msg['created_at']) ?></td>
+                    <td data-label="Action" class="cell-actions">
+                      <div class="action-group">
+                        <?php if ($msg['sender_id'] != $owner['id'] && !$msg['is_read']): ?>
+                          <form method="POST">
+                            <input type="hidden" name="mark_read" value="1">
+                            <input type="hidden" name="message_id" value="<?= $msg['id'] ?>">
+                            <button type="submit" class="action-btn-small approve" onclick="return confirm('Mark this message as read?')">Read</button>
+                          </form>
+                        <?php endif; ?>
+                        <?php if ($msg['sender_id'] != $owner['id']): ?>
+                          <button type="button" class="action-btn reply-btn" data-id="<?= $msg['id'] ?>" data-message="<?= htmlspecialchars(json_encode($msg['message']), ENT_QUOTES, 'UTF-8') ?>">Reply</button>
+                        <?php endif; ?>
+                      </div>
                     </td>
                   </tr>
                 <?php endforeach; ?>

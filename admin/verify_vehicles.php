@@ -1,4 +1,46 @@
-<?php require_once 'verify_vehicles_logic.php'; ?>
+<?php require_once 'verify_vehicles_logic.php';
+
+$ajax = isset($_GET['ajax']) && $_GET['ajax'] === '1';
+if ($ajax && ($_GET['section'] ?? '') === 'pending-vehicles') {
+  if (empty($vehicles)) {
+    echo '<p class="empty-state">No vehicles found.</p>';
+  } else {
+    foreach ($vehicles as $vehicle) {
+      echo '<div class="vehicle-card">';
+      echo '<div class="vehicle-image">';
+      if (!empty($vehicle['image'])) {
+        echo '<img src="../' . clean($vehicle['image']) . '" alt="' . clean($vehicle['name']) . '">';
+      } else {
+        echo '<div class="no-image">No Image</div>';
+      }
+      echo '</div>';
+      echo '<div class="vehicle-details"><h3>' . clean($vehicle['name']) . '</h3><div class="table-wrapper"><table class="table info-table">';
+      echo '<tr><th>Owner</th><td data-label="Owner">' . clean($vehicle['owner_name']) . '</td></tr>';
+      echo '<tr><th>Model Year</th><td data-label="Model Year">' . clean($vehicle['model_year']) . '</td></tr>';
+      echo '<tr><th>Category</th><td data-label="Category">' . clean(ucfirst(str_replace('_', ' ', $vehicle['category']))) . '</td></tr>';
+      echo '<tr><th>Transmission</th><td data-label="Transmission">' . clean(ucfirst($vehicle['transmission'])) . '</td></tr>';
+      echo '<tr><th>Price / Day</th><td data-label="Price / Day">$' . number_format($vehicle['price_per_day'], 2) . '</td></tr>';
+      echo '<tr><th>Status</th><td data-label="Status"><span class="status-badge ' . statusBadgeClass($vehicle['approval_status']) . '">' . statusLabel($vehicle['approval_status']) . '</span></td></tr>';
+      echo '<tr><th>Description</th><td class="cell-message" data-label="Description">' . clean($vehicle['description'] ?? 'No description') . '</td></tr>';
+      echo '</table></div></div>';
+      echo '<div class="vehicle-actions">';
+      if ($vehicle['approval_status'] === 'pending') {
+        echo '<form method="POST" action="verify_vehicles_logic.php"><input type="hidden" name="vehicle_id" value="' . $vehicle['id'] . '"><input type="hidden" name="action" value="approve"><button type="submit" class="action-btn-small approve">Approve</button></form>';
+        echo '<button class="action-btn-small reject" onclick="showRejectModal(' . $vehicle['id'] . ')">Disapprove</button>';
+      } elseif ($vehicle['approval_status'] === 'approved') {
+        echo '<span class="text-success">Approved</span>';
+      } else {
+        echo '<span class="text-danger">Disapproved</span>';
+        if (!empty($vehicle['approval_feedback'])) {
+          echo '<br><small>Feedback: ' . clean($vehicle['approval_feedback']) . '</small>';
+        }
+      }
+      echo '</div></div>';
+    }
+  }
+  exit;
+}
+?>
 
 <!DOCTYPE html>
 <html lang="en">
@@ -8,6 +50,7 @@
   <title>Verify Vehicles | Carbnb Admin</title>
   <link rel="stylesheet" href="css/admin_style.css?v=20260702">
   <link rel="stylesheet" href="css/admin_style_backup.css?v=20260702">
+  <link rel="stylesheet" href="css/admin_responsive.css?v=20260801">
 </head>
 <body>
   <div class="overlay"></div>
@@ -57,7 +100,7 @@
         </div>
       <?php endif; ?>
 
-      <section class="card">
+      <section class="card" id="admin-pending-vehicles" data-live-refresh="verify_vehicles.php?ajax=1&section=pending-vehicles" data-live-target="#admin-pending-vehicles">
         <h3 class="section-title">Pending Vehicle Listings</h3>
         
         <?php if (empty($vehicles)): ?>
@@ -75,45 +118,47 @@
 
               <div class="vehicle-details">
                 <h3><?= clean($vehicle['name']) ?></h3>
-                <table class="info-table">
-                  <tr>
-                    <th>Owner</th>
-                    <td><?= clean($vehicle['owner_name']) ?></td>
-                  </tr>
-                  <tr>
-                    <th>Model Year</th>
-                    <td><?= clean($vehicle['model_year']) ?></td>
-                  </tr>
-                  <tr>
-                    <th>Category</th>
-                    <td><?= clean(ucfirst(str_replace('_', ' ', $vehicle['category']))) ?></td>
-                  </tr>
-                  <tr>
-                    <th>Transmission</th>
-                    <td><?= clean(ucfirst($vehicle['transmission'])) ?></td>
-                  </tr>
-                  <tr>
-                    <th>Price / Day</th>
-                    <td>$<?= number_format($vehicle['price_per_day'], 2) ?></td>
-                  </tr>
-                  <tr>
-                    <th>Status</th>
-                    <td>
-                      <span class="status-badge <?= statusBadgeClass($vehicle['approval_status']) ?>">
-                        <?= statusLabel($vehicle['approval_status']) ?>
-                      </span>
-                    </td>
-                  </tr>
-                  <tr>
-                    <th>Description</th>
-                    <td><?= clean($vehicle['description'] ?? 'No description') ?></td>
-                  </tr>
-                </table>
+                <div class="table-wrapper">
+                  <table class="table info-table">
+                    <tr>
+                      <th>Owner</th>
+                      <td data-label="Owner"><?= clean($vehicle['owner_name']) ?></td>
+                    </tr>
+                    <tr>
+                      <th>Model Year</th>
+                      <td data-label="Model Year"><?= clean($vehicle['model_year']) ?></td>
+                    </tr>
+                    <tr>
+                      <th>Category</th>
+                      <td data-label="Category"><?= clean(ucfirst(str_replace('_', ' ', $vehicle['category']))) ?></td>
+                    </tr>
+                    <tr>
+                      <th>Transmission</th>
+                      <td data-label="Transmission"><?= clean(ucfirst($vehicle['transmission'])) ?></td>
+                    </tr>
+                    <tr>
+                      <th>Price / Day</th>
+                      <td data-label="Price / Day">$<?= number_format($vehicle['price_per_day'], 2) ?></td>
+                    </tr>
+                    <tr>
+                      <th>Status</th>
+                      <td data-label="Status">
+                        <span class="status-badge <?= statusBadgeClass($vehicle['approval_status']) ?>">
+                          <?= statusLabel($vehicle['approval_status']) ?>
+                        </span>
+                      </td>
+                    </tr>
+                    <tr>
+                      <th>Description</th>
+                      <td class="cell-message" data-label="Description"><?= clean($vehicle['description'] ?? 'No description') ?></td>
+                    </tr>
+                  </table>
+                </div>
               </div>
 
               <div class="vehicle-actions">
                 <?php if ($vehicle['approval_status'] === 'pending'): ?>
-                  <form method="POST" action="verify_vehicles_logic.php" style="display:inline;">
+                  <form method="POST" action="verify_vehicles_logic.php">
                     <input type="hidden" name="vehicle_id" value="<?= $vehicle['id'] ?>">
                     <input type="hidden" name="action" value="approve">
                     <button type="submit" class="action-btn-small approve">Approve</button>
@@ -194,6 +239,26 @@
         });
       });
     });
+
+    (function () {
+      const liveTarget = document.getElementById('admin-pending-vehicles');
+      if (!liveTarget || !liveTarget.dataset.liveRefresh) return;
+
+      const refreshUrl = liveTarget.dataset.liveRefresh;
+      const refreshSection = function () {
+        fetch(refreshUrl)
+          .then(function (response) { return response.text(); })
+          .then(function (html) {
+            liveTarget.innerHTML = '<h3 class="section-title">Pending Vehicle Listings</h3>' + html;
+          })
+          .catch(function (error) {
+            console.log('Vehicle verification live refresh failed:', error);
+          });
+      };
+
+      refreshSection();
+      setInterval(refreshSection, 8000);
+    })();
 
     // Reject modal functions
     function showRejectModal(vehicleId) {

@@ -1,4 +1,24 @@
-<?php require_once 'delete_user_logic.php'; ?>
+<?php require_once 'delete_user_logic.php'; 
+
+$ajax = isset($_GET['ajax']) && $_GET['ajax'] === '1';
+if ($ajax && ($_GET['section'] ?? '') === 'registered-users') {
+  if (empty($users)) {
+    echo '<tr><td colspan="6" class="empty-state">No users found.</td></tr>';
+  } else {
+    foreach ($users as $user) {
+      echo '<tr>';
+      echo '<td class="cell-name" data-label="Name">' . clean($user['full_name']) . '</td>';
+      echo '<td class="cell-email" data-label="Email">' . clean($user['email']) . '</td>';
+      echo '<td data-label="Role">' . clean(ucfirst($user['role'])) . '</td>';
+      echo '<td data-label="Status"><span class="status-badge ' . statusBadgeClass($user['status']) . '">' . statusLabel($user['status']) . '</span></td>';
+      echo '<td data-label="Registered">' . formatDate($user['created_at']) . '</td>';
+      echo '<td class="cell-actions" data-label="Action"><div class="action-group"><a href="delete_user.php?delete_id=' . (int) $user['id'] . '" class="action-btn-small reject" onclick="return confirm(\'Are you sure you want to delete this user? They will be moved to the trash bin.\')">Delete</a></div></td>';
+      echo '</tr>';
+    }
+  }
+  exit;
+}
+?>
 
 <!DOCTYPE html>
 <html lang="en">
@@ -71,7 +91,7 @@
                 <th>Action</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody id="admin-delete-users-table" data-live-refresh="delete_user.php?ajax=1&section=registered-users" data-live-target="#admin-delete-users-table">
               <?php if (empty($users)): ?>
                 <tr>
                   <td colspan="6" class="empty-state">No users found.</td>
@@ -79,17 +99,19 @@
               <?php else: ?>
                 <?php foreach ($users as $user): ?>
                   <tr>
-                    <td><?= clean($user['full_name']) ?></td>
-                    <td><?= clean($user['email']) ?></td>
-                    <td><?= clean(ucfirst($user['role'])) ?></td>
-                    <td>
+                    <td class="cell-name" data-label="Name"><?= clean($user['full_name']) ?></td>
+                    <td class="cell-email" data-label="Email"><?= clean($user['email']) ?></td>
+                    <td data-label="Role"><?= clean(ucfirst($user['role'])) ?></td>
+                    <td data-label="Status">
                       <span class="status-badge <?= statusBadgeClass($user['status']) ?>">
                         <?= statusLabel($user['status']) ?>
                       </span>
                     </td>
-                    <td><?= formatDate($user['created_at']) ?></td>
-                    <td>
-                      <a href="delete_user.php?delete_id=<?= $user['id'] ?>" class="action-btn-small reject" onclick="return confirm('Are you sure you want to delete this user? They will be moved to the trash bin.')">Delete</a>
+                    <td data-label="Registered"><?= formatDate($user['created_at']) ?></td>
+                    <td class="cell-actions" data-label="Action">
+                      <div class="action-group">
+                        <a href="delete_user.php?delete_id=<?= $user['id'] ?>" class="action-btn-small reject" onclick="return confirm('Are you sure you want to delete this user? They will be moved to the trash bin.')">Delete</a>
+                      </div>
                     </td>
                   </tr>
                 <?php endforeach; ?>
@@ -146,6 +168,30 @@
         });
       });
     });
+
+    (function () {
+      const liveTargets = document.querySelectorAll('[data-live-refresh]');
+      liveTargets.forEach(function (node) {
+        const refreshUrl = node.dataset.liveRefresh;
+        const targetSelector = node.dataset.liveTarget || '#' + node.id;
+        const refreshSection = function () {
+          fetch(refreshUrl)
+            .then(function (response) { return response.text(); })
+            .then(function (html) {
+              const targetNode = document.querySelector(targetSelector);
+              if (targetNode) {
+                targetNode.innerHTML = html;
+              }
+            })
+            .catch(function (error) {
+              console.log('Delete user live refresh failed:', error);
+            });
+        };
+
+        refreshSection();
+        setInterval(refreshSection, 8000);
+      });
+    })();
   </script>
 </body>
 </html>

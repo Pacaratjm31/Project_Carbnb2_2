@@ -76,6 +76,45 @@ try {
 } catch (PDOException $e) {
     $error = $e->getMessage();
 }
+
+$ajax = isset($_GET['ajax']) && $_GET['ajax'] === '1';
+if ($ajax && ($_GET['section'] ?? '') === 'all-user-messages') {
+    if (empty($allMessages)) {
+        echo '<tr><td colspan="6" class="empty-state">No messages found.</td></tr>';
+    } else {
+        foreach ($allMessages as $msg) {
+            echo '<tr>';
+            echo '<td data-label="From">' . clean($msg['sender_name']) . ' <small>(' . ucfirst($msg['sender_role']) . ')</small></td>';
+            echo '<td data-label="To">' . clean($msg['receiver_name']) . ' <small>(' . ucfirst($msg['receiver_role']) . ')</small></td>';
+            echo '<td class="cell-message" data-label="Message">' . clean(substr($msg['message'], 0, 80)) . (strlen($msg['message']) > 80 ? '...' : '') . '</td>';
+            echo '<td data-label="Status"><span class="status-badge ' . ($msg['is_read'] ? 'available' : 'pending') . '">' . ($msg['is_read'] ? 'Read' : 'Unread') . '</span></td>';
+            echo '<td data-label="Date">' . formatDate($msg['created_at']) . '</td>';
+            echo '<td class="cell-actions" data-label="Action"><div class="action-group">';
+            if (!$msg['is_read']) {
+                echo '<form method="POST"><input type="hidden" name="mark_read" value="1"><input type="hidden" name="message_id" value="' . $msg['id'] . '"><button type="submit" class="action-btn-small approve" onclick="return confirm(\'Mark this message as read?\')">Read</button></form>';
+            }
+            echo '</div></td></tr>';
+        }
+    }
+    exit;
+}
+
+if ($ajax && ($_GET['section'] ?? '') === 'contact-form-messages') {
+    if (empty($contactMessages)) {
+        echo '<tr><td colspan="5" class="empty-state">No contact messages found.</td></tr>';
+    } else {
+        foreach ($contactMessages as $msg) {
+            echo '<tr>';
+            echo '<td data-label="Name">' . clean($msg['name']) . '</td>';
+            echo '<td class="cell-email" data-label="Email">' . clean($msg['email']) . '</td>';
+            echo '<td class="cell-message" data-label="Message">' . clean(substr($msg['message'], 0, 100)) . (strlen($msg['message']) > 100 ? '...' : '') . '</td>';
+            echo '<td data-label="Status"><span class="status-badge ' . ($msg['is_replied'] ? 'available' : 'pending') . '">' . ($msg['is_replied'] ? 'Replied' : 'Pending') . '</span></td>';
+            echo '<td data-label="Date">' . formatDate($msg['created_at']) . '</td>';
+            echo '</tr>';
+        }
+    }
+    exit;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -85,6 +124,7 @@ try {
   <title>Contact Messages | Carbnb Admin</title>
   <link rel="stylesheet" href="css/admin_style.css?v=20260702">
   <link rel="stylesheet" href="css/admin_style_backup.css?v=20260702">
+  <link rel="stylesheet" href="css/admin_responsive.css?v=20260801">
 </head>
 <body>
   <div class="overlay"></div>
@@ -128,7 +168,7 @@ try {
         <h3 class="section-title">Send Message to User</h3>
         <form method="POST" id="sendMessageForm">
           <input type="hidden" name="send_message" value="1">
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+          <div class="form-grid-2" style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
             <div class="form-group">
               <label>Select User</label>
               <select name="user_id" class="form-control" required>
@@ -167,26 +207,28 @@ try {
                   <th>Action</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody id="admin-all-user-messages" data-live-refresh="contact_messages.php?ajax=1&section=all-user-messages" data-live-target="#admin-all-user-messages">
                 <?php foreach ($allMessages as $msg): ?>
                   <tr>
-                    <td><?= clean($msg['sender_name']) ?> <small>(<?= ucfirst($msg['sender_role']) ?>)</small></td>
-                    <td><?= clean($msg['receiver_name']) ?> <small>(<?= ucfirst($msg['receiver_role']) ?>)</small></td>
-                    <td><?= clean(substr($msg['message'], 0, 80)) ?><?= strlen($msg['message']) > 80 ? '...' : '' ?></td>
-                    <td>
+                    <td data-label="From"><?= clean($msg['sender_name']) ?> <small>(<?= ucfirst($msg['sender_role']) ?>)</small></td>
+                    <td data-label="To"><?= clean($msg['receiver_name']) ?> <small>(<?= ucfirst($msg['receiver_role']) ?>)</small></td>
+                    <td class="cell-message" data-label="Message"><?= clean(substr($msg['message'], 0, 80)) ?><?= strlen($msg['message']) > 80 ? '...' : '' ?></td>
+                    <td data-label="Status">
                       <span class="status-badge <?= $msg['is_read'] ? 'available' : 'pending' ?>">
                         <?= $msg['is_read'] ? 'Read' : 'Unread' ?>
                       </span>
                     </td>
-                    <td><?= formatDate($msg['created_at']) ?></td>
-                    <td>
-                      <?php if (!$msg['is_read']): ?>
-                        <form method="POST" style="display:inline;">
-                          <input type="hidden" name="mark_read" value="1">
-                          <input type="hidden" name="message_id" value="<?= $msg['id'] ?>">
-                          <button type="submit" class="action-btn-small approve" onclick="return confirm('Mark this message as read?')">Read</button>
-                        </form>
-                      <?php endif; ?>
+                    <td data-label="Date"><?= formatDate($msg['created_at']) ?></td>
+                    <td class="cell-actions" data-label="Action">
+                      <div class="action-group">
+                        <?php if (!$msg['is_read']): ?>
+                          <form method="POST">
+                            <input type="hidden" name="mark_read" value="1">
+                            <input type="hidden" name="message_id" value="<?= $msg['id'] ?>">
+                            <button type="submit" class="action-btn-small approve" onclick="return confirm('Mark this message as read?')">Read</button>
+                          </form>
+                        <?php endif; ?>
+                      </div>
                     </td>
                   </tr>
                 <?php endforeach; ?>
@@ -214,18 +256,18 @@ try {
                   <th>Date</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody id="admin-contact-form-messages" data-live-refresh="contact_messages.php?ajax=1&section=contact-form-messages" data-live-target="#admin-contact-form-messages">
                 <?php foreach ($contactMessages as $msg): ?>
                   <tr>
-                    <td><?= clean($msg['name']) ?></td>
-                    <td><?= clean($msg['email']) ?></td>
-                    <td><?= clean(substr($msg['message'], 0, 100)) ?><?= strlen($msg['message']) > 100 ? '...' : '' ?></td>
-                    <td>
+                    <td data-label="Name"><?= clean($msg['name']) ?></td>
+                    <td class="cell-email" data-label="Email"><?= clean($msg['email']) ?></td>
+                    <td class="cell-message" data-label="Message"><?= clean(substr($msg['message'], 0, 100)) ?><?= strlen($msg['message']) > 100 ? '...' : '' ?></td>
+                    <td data-label="Status">
                       <span class="status-badge <?= $msg['is_replied'] ? 'available' : 'pending' ?>">
                         <?= $msg['is_replied'] ? 'Replied' : 'Pending' ?>
                       </span>
                     </td>
-                    <td><?= formatDate($msg['created_at']) ?></td>
+                    <td data-label="Date"><?= formatDate($msg['created_at']) ?></td>
                   </tr>
                 <?php endforeach; ?>
               </tbody>
@@ -281,6 +323,30 @@ try {
         });
       });
     });
+
+    (function () {
+      const liveTargets = document.querySelectorAll('[data-live-refresh]');
+      liveTargets.forEach(function (node) {
+        const refreshUrl = node.dataset.liveRefresh;
+        const targetSelector = node.dataset.liveTarget || '#' + node.id;
+        const refreshSection = function () {
+          fetch(refreshUrl)
+            .then(function (response) { return response.text(); })
+            .then(function (html) {
+              const targetNode = document.querySelector(targetSelector);
+              if (targetNode) {
+                targetNode.innerHTML = html;
+              }
+            })
+            .catch(function (error) {
+              console.log('Messages live refresh failed:', error);
+            });
+        };
+
+        refreshSection();
+        setInterval(refreshSection, 8000);
+      });
+    })();
   </script>
 </body>
 </html>

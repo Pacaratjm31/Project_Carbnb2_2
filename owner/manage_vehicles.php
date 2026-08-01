@@ -80,6 +80,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['remove_maintenance'],
 
 $vehicles = get_owner_vehicles($pdo, $owner['id']);
 
+$ajax = isset($_GET['ajax']) && $_GET['ajax'] === '1';
+if ($ajax && ($_GET['section'] ?? '') === 'vehicle-list') {
+    if (empty($vehicles)) {
+        echo '<tr><td colspan="6" class="empty-state">No vehicles registered yet.</td></tr>';
+    } else {
+        foreach ($vehicles as $vehicle) {
+            echo '<tr>';
+            echo '<td data-label="Vehicle">' . htmlspecialchars($vehicle['name']) . '</td>';
+            echo '<td data-label="Category">' . htmlspecialchars(str_replace('_', ' ', $vehicle['category'])) . '</td>';
+            echo '<td data-label="Price">' . format_currency($vehicle['price_per_day']) . '/day</td>';
+            echo '<td data-label="Availability"><span class="status-badge ' . htmlspecialchars(status_badge_class($vehicle['availability_status'])) . '">' . htmlspecialchars(status_label($vehicle['availability_status'])) . '</span></td>';
+            echo '<td data-label="Approval"><span class="status-badge ' . htmlspecialchars(approval_status_badge_class($vehicle['approval_status'])) . '">' . htmlspecialchars(approval_status_label($vehicle['approval_status'])) . '</span></td>';
+            echo '<td data-label="Actions" class="cell-actions"><div class="action-group">';
+            if ($vehicle['availability_status'] === 'available') {
+                echo '<form method="POST" onsubmit="return confirm(\'Set this vehicle to maintenance?\');">';
+                echo '<input type="hidden" name="vehicle_id" value="' . (int) $vehicle['id'] . '">';
+                echo '<button type="submit" name="set_maintenance" class="action-btn-small" style="background:#ffc107; color:#111;">Set Maintenance</button>';
+                echo '</form>';
+            }
+            if ($vehicle['availability_status'] === 'rented') {
+                echo '<form method="POST" onsubmit="return confirm(\'Make this vehicle available again?\');">';
+                echo '<input type="hidden" name="vehicle_id" value="' . (int) $vehicle['id'] . '">';
+                echo '<button type="submit" name="make_available" class="action-btn-small approve">Make Available</button>';
+                echo '</form>';
+            }
+            if ($vehicle['availability_status'] === 'maintenance') {
+                echo '<form method="POST" onsubmit="return confirm(\'Remove maintenance and make this vehicle available in the market?\');">';
+                echo '<input type="hidden" name="vehicle_id" value="' . (int) $vehicle['id'] . '">';
+                echo '<button type="submit" name="remove_maintenance" class="action-btn-small approve">Remove Maintenance</button>';
+                echo '</form>';
+            }
+            echo '</div></td>';
+            echo '</tr>';
+        }
+    }
+    exit;
+}
+
 // Check for success message from redirect
 $success = $_GET['success'] ?? '';
 $error = $error ?? '';
@@ -133,54 +171,81 @@ $error = $error ?? '';
         <?php if (empty($vehicles)) : ?>
           <p class="empty-state">No vehicles registered yet.</p>
         <?php else : ?>
-          <table class="table">
-            <thead>
-              <tr>
-                <th>Vehicle</th>
-                <th>Category</th>
-                <th>Price</th>
-                <th>Availability</th>
-                <th>Approval</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <?php foreach ($vehicles as $vehicle) : ?>
+          <div class="table-wrapper">
+            <table class="table">
+              <thead>
                 <tr>
-                  <td><?php echo htmlspecialchars($vehicle['name']); ?></td>
-                  <td><?php echo htmlspecialchars(str_replace('_', ' ', $vehicle['category'])); ?></td>
-                  <td><?php echo format_currency($vehicle['price_per_day']); ?>/day</td>
-                  <td><span class="status-badge <?php echo htmlspecialchars(status_badge_class($vehicle['availability_status'])); ?>"><?php echo htmlspecialchars(status_label($vehicle['availability_status'])); ?></span></td>
-                  <td><span class="status-badge <?php echo htmlspecialchars(approval_status_badge_class($vehicle['approval_status'])); ?>"><?php echo htmlspecialchars(approval_status_label($vehicle['approval_status'])); ?></span></td>
-                  <td>
-                    <?php if ($vehicle['availability_status'] === 'available') : ?>
-                      <form method="POST" style="display:inline; margin-right:5px;" onsubmit="return confirm('Set this vehicle to maintenance?');">
-                        <input type="hidden" name="vehicle_id" value="<?php echo (int) $vehicle['id']; ?>">
-                        <button type="submit" name="set_maintenance" class="action-btn-small" style="background:#ffc107; color:#111;">Set Maintenance</button>
-                      </form>
-                    <?php endif; ?>
-                    <?php if ($vehicle['availability_status'] === 'rented') : ?>
-                      <form method="POST" style="display:inline; margin-right:5px;" onsubmit="return confirm('Make this vehicle available again?');">
-                        <input type="hidden" name="vehicle_id" value="<?php echo (int) $vehicle['id']; ?>">
-                        <button type="submit" name="make_available" class="action-btn-small approve">Make Available</button>
-                      </form>
-                    <?php endif; ?>
-                    <?php if ($vehicle['availability_status'] === 'maintenance') : ?>
-                      <form method="POST" style="display:inline;" onsubmit="return confirm('Remove maintenance and make this vehicle available in the market?');">
-                        <input type="hidden" name="vehicle_id" value="<?php echo (int) $vehicle['id']; ?>">
-                        <button type="submit" name="remove_maintenance" class="action-btn-small approve">Remove Maintenance</button>
-                      </form>
-                    <?php endif; ?>
-                  </td>
+                  <th>Vehicle</th>
+                  <th>Category</th>
+                  <th>Price</th>
+                  <th>Availability</th>
+                  <th>Approval</th>
+                  <th>Actions</th>
                 </tr>
-              <?php endforeach; ?>
-            </tbody>
-          </table>
+              </thead>
+              <tbody id="owner-vehicle-list" data-live-refresh="manage_vehicles.php?ajax=1&section=vehicle-list" data-live-target="tbody#owner-vehicle-list">
+                <?php foreach ($vehicles as $vehicle) : ?>
+                  <tr>
+                    <td data-label="Vehicle"><?php echo htmlspecialchars($vehicle['name']); ?></td>
+                    <td data-label="Category"><?php echo htmlspecialchars(str_replace('_', ' ', $vehicle['category'])); ?></td>
+                    <td data-label="Price"><?php echo format_currency($vehicle['price_per_day']); ?>/day</td>
+                    <td data-label="Availability"><span class="status-badge <?php echo htmlspecialchars(status_badge_class($vehicle['availability_status'])); ?>"><?php echo htmlspecialchars(status_label($vehicle['availability_status'])); ?></span></td>
+                    <td data-label="Approval"><span class="status-badge <?php echo htmlspecialchars(approval_status_badge_class($vehicle['approval_status'])); ?>"><?php echo htmlspecialchars(approval_status_label($vehicle['approval_status'])); ?></span></td>
+                    <td data-label="Actions" class="cell-actions">
+                      <div class="action-group">
+                        <?php if ($vehicle['availability_status'] === 'available') : ?>
+                          <form method="POST" onsubmit="return confirm('Set this vehicle to maintenance?');">
+                            <input type="hidden" name="vehicle_id" value="<?php echo (int) $vehicle['id']; ?>">
+                            <button type="submit" name="set_maintenance" class="action-btn-small" style="background:#ffc107; color:#111;">Set Maintenance</button>
+                          </form>
+                        <?php endif; ?>
+                        <?php if ($vehicle['availability_status'] === 'rented') : ?>
+                          <form method="POST" onsubmit="return confirm('Make this vehicle available again?');">
+                            <input type="hidden" name="vehicle_id" value="<?php echo (int) $vehicle['id']; ?>">
+                            <button type="submit" name="make_available" class="action-btn-small approve">Make Available</button>
+                          </form>
+                        <?php endif; ?>
+                        <?php if ($vehicle['availability_status'] === 'maintenance') : ?>
+                          <form method="POST" onsubmit="return confirm('Remove maintenance and make this vehicle available in the market?');">
+                            <input type="hidden" name="vehicle_id" value="<?php echo (int) $vehicle['id']; ?>">
+                            <button type="submit" name="remove_maintenance" class="action-btn-small approve">Remove Maintenance</button>
+                          </form>
+                        <?php endif; ?>
+                      </div>
+                    </td>
+                  </tr>
+                <?php endforeach; ?>
+              </tbody>
+            </table>
+          </div>
         <?php endif; ?>
       </section>
     </main>
   </div>
 
   <script src="js/owner_script.js"></script>
+  <script>
+    (function () {
+      const tableBody = document.getElementById('owner-vehicle-list');
+      if (!tableBody || !tableBody.dataset.liveRefresh) return;
+
+      const refreshUrl = tableBody.dataset.liveRefresh;
+      const target = tableBody.dataset.liveTarget || '#owner-vehicle-list';
+      const refreshSection = () => {
+        fetch(refreshUrl)
+          .then((response) => response.text())
+          .then((html) => {
+            const targetNode = document.querySelector(target);
+            if (targetNode) {
+              targetNode.innerHTML = html;
+            }
+          })
+          .catch((error) => console.log('Vehicle list refresh failed:', error));
+      };
+
+      refreshSection();
+      setInterval(refreshSection, 7000);
+    })();
+  </script>
 </body>
 </html>

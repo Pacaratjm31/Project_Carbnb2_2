@@ -135,6 +135,52 @@ function build_vehicle_image_path($value): string
 }
 
 $imagePath = build_vehicle_image_path($data['car_image'] ?? '');
+
+$ajax = isset($_GET['ajax']) && $_GET['ajax'] === '1';
+if ($ajax && ($_GET['section'] ?? '') === 'payment-status') {
+    if ($paymentStatus === 'verified') {
+        echo '<div class="payment-box">';
+        echo '<h3>Payment Completed</h3>';
+        echo '<p>This booking has been paid and verified by the admin. No further action is needed.</p>';
+        echo '<a href="record.php" class="btn-return">View Payment History</a>';
+        echo '</div>';
+    } elseif ($paymentStatus === 'pending') {
+        echo '<div class="payment-box">';
+        echo '<h3>Payment Received — Awaiting Admin Verification</h3>';
+        echo '<p>Your payment was received and is now waiting for admin approval. You\'ll be notified once it\'s verified.</p>';
+        echo '<a href="record.php" class="btn-return">View Payment History</a>';
+        echo '</div>';
+    } else {
+        if ($paymentStatus === 'disapproved') {
+            echo '<div class="payment-box">';
+            echo '<h3>Payment Disapproved</h3>';
+            echo '<p>Your previous payment was disapproved by the admin. Please try paying again below.</p>';
+            echo '</div>';
+        }
+
+        echo '<div class="payment-box">';
+        echo '<h3>Pay with Xendit</h3>';
+        echo '<p>Continue your secure automatic payment through Xendit.</p>';
+        echo '</div>';
+
+        echo '<div class="payment-form">';
+        echo '<button class="btn" type="button" id="payWithXendit">Pay with Xendit</button>';
+        echo '</div>';
+
+        echo '<div class="payment-form">';
+        echo '<p>Send your payment receipt here for admin verification.</p>';
+        echo '<form id="manualPaymentForm" enctype="multipart/form-data">';
+        echo '<input type="file" name="proof_image" id="proof_image" accept="image/jpeg,image/png,image/webp" required>';
+        echo '<button class="btn" type="submit" id="submitPaymentBtn" style="margin-top:10px;">Submit Payment</button>';
+        echo '</form>';
+        echo '</div>';
+
+        echo '<div class="payment-form">';
+        echo '<a href="javascript:history.back()" class="btn-return">← Return</a>';
+        echo '</div>';
+    }
+    exit;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -158,59 +204,77 @@ $imagePath = build_vehicle_image_path($data['car_image'] ?? '');
             <p><strong>Total:</strong> ₱<?= htmlspecialchars((string) $data['total_price']) ?></p>
         </div>
 
-        <?php if ($paymentStatus === 'verified'): ?>
+        <div id="renter-payment-status" data-live-refresh="paid.php?ajax=1&section=payment-status&booking_id=<?= (int) $booking_id ?>" data-live-target="#renter-payment-status">
+            <?php if ($paymentStatus === 'verified'): ?>
 
-            <div class="payment-box">
-                <h3>Payment Completed</h3>
-                <p>This booking has been paid and verified by the admin. No further action is needed.</p>
-                <a href="record.php" class="btn-return">View Payment History</a>
-            </div>
+                <div class="payment-box">
+                    <h3>Payment Completed</h3>
+                    <p>This booking has been paid and verified by the admin. No further action is needed.</p>
+                    <a href="record.php" class="btn-return">View Payment History</a>
+                </div>
 
-        <?php elseif ($paymentStatus === 'pending'): ?>
+            <?php elseif ($paymentStatus === 'pending'): ?>
 
-            <div class="payment-box">
-                <h3>Payment Received — Awaiting Admin Verification</h3>
-                <p>Your payment was received and is now waiting for admin approval. You'll be notified once it's verified.</p>
-                <a href="record.php" class="btn-return">View Payment History</a>
-            </div>
+                <div class="payment-box">
+                    <h3>Payment Received — Awaiting Admin Verification</h3>
+                    <p>Your payment was received and is now waiting for admin approval. You'll be notified once it's verified.</p>
+                    <a href="record.php" class="btn-return">View Payment History</a>
+                </div>
 
-        <?php else: ?>
+            <?php else: ?>
 
-            <?php if ($paymentStatus === 'disapproved'): ?>
-            <div class="payment-box">
-                <h3>Payment Disapproved</h3>
-                <p>Your previous payment was disapproved by the admin. Please try paying again below.</p>
-            </div>
+                <?php if ($paymentStatus === 'disapproved'): ?>
+                <div class="payment-box">
+                    <h3>Payment Disapproved</h3>
+                    <p>Your previous payment was disapproved by the admin. Please try paying again below.</p>
+                </div>
+                <?php endif; ?>
+
+                <div class="payment-box">
+                    <h3>Pay with Xendit</h3>
+                    <p>Continue your secure automatic payment through Xendit.</p>
+                </div>
+
+                <div class="payment-form">
+                    <button class="btn" type="button" id="payWithXendit">Pay with Xendit</button>
+                </div>
+
+                <div class="payment-form">
+                    <p>Send your payment receipt here for admin verification.</p>
+                    <form id="manualPaymentForm" enctype="multipart/form-data">
+                        <input type="file" name="proof_image" id="proof_image" accept="image/jpeg,image/png,image/webp" required>
+
+                        <button class="btn" type="submit" id="submitPaymentBtn" style="margin-top:10px;">Submit Payment</button>
+                    </form>
+                </div>
+
+                <div class="payment-form">
+                    <a href="javascript:history.back()" class="btn-return">← Return</a>
+                </div>
+
             <?php endif; ?>
-
-            <div class="payment-box">
-                <h3>Pay with Xendit</h3>
-                <p>Continue your secure automatic payment through Xendit.</p>
-            </div>
-
-            <div class="payment-form">
-                <button class="btn" type="button" id="payWithXendit">Pay with Xendit</button>
-            </div>
-
-            <div class="payment-form">
-                <p>Send your payment receipt here for admin verification.</p>
-                <form id="manualPaymentForm" enctype="multipart/form-data">
-                    <input type="file" name="proof_image" id="proof_image" accept="image/jpeg,image/png,image/webp" required>
-
-                    <button class="btn" type="submit" id="submitPaymentBtn" style="margin-top:10px;">Submit Payment</button>
-                </form>
-            </div>
-
-            <div class="payment-form">
-                <a href="javascript:history.back()" class="btn-return">← Return</a>
-            </div>
-
-        <?php endif; ?>
+        </div>
 
     </div>
 
     <?php if ($paymentStatus !== 'verified' && $paymentStatus !== 'pending'): ?>
     <script>
+        function refreshPaymentStatus() {
+            const paymentStatusNode = document.getElementById('renter-payment-status');
+            if (!paymentStatusNode || !paymentStatusNode.dataset.liveRefresh) {
+                return;
+            }
+
+            fetch(paymentStatusNode.dataset.liveRefresh)
+                .then(function (response) { return response.text(); })
+                .then(function (html) {
+                    paymentStatusNode.innerHTML = html;
+                })
+                .catch(function (error) {
+                    console.log('Payment status refresh failed:', error);
+                });
+        }
+
         document.getElementById('payWithXendit')?.addEventListener('click', async function () {
             const formData = new FormData();
             formData.append('booking_id', '<?= (int) $booking_id ?>');
@@ -254,7 +318,9 @@ $imagePath = build_vehicle_image_path($data['car_image'] ?? '');
 
                 if (result.success) {
                     alert(result.message || 'Payment submitted. Waiting for admin verification.');
-                    window.location.reload();
+                    refreshPaymentStatus();
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Submit Payment';
                 } else {
                     alert(result.message || 'Unable to submit payment.');
                     submitBtn.disabled = false;
@@ -267,6 +333,30 @@ $imagePath = build_vehicle_image_path($data['car_image'] ?? '');
                 submitBtn.textContent = 'Submit Payment';
             }
         });
+
+        (function () {
+            const liveTargets = document.querySelectorAll('[data-live-refresh]');
+            liveTargets.forEach(function (node) {
+                const refreshUrl = node.dataset.liveRefresh;
+                const targetSelector = node.dataset.liveTarget || '#' + node.id;
+                const refreshSection = function () {
+                    fetch(refreshUrl)
+                        .then(function (response) { return response.text(); })
+                        .then(function (html) {
+                            const targetNode = document.querySelector(targetSelector);
+                            if (targetNode) {
+                                targetNode.innerHTML = html;
+                            }
+                        })
+                        .catch(function (error) {
+                            console.log('Live refresh failed:', error);
+                        });
+                };
+
+                refreshSection();
+                setInterval(refreshSection, 8000);
+            });
+        })();
     </script>
     <?php endif; ?>
 

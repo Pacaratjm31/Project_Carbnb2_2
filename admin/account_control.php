@@ -1,4 +1,24 @@
-<?php require_once 'account_control_logic.php'; ?>
+<?php require_once 'account_control_logic.php'; 
+
+$ajax = isset($_GET['ajax']) && $_GET['ajax'] === '1';
+if ($ajax && ($_GET['section'] ?? '') === 'locked-accounts') {
+  if (empty($lockedUsers)) {
+    echo '<tr><td colspan="6" class="empty-state">No locked accounts found.</td></tr>';
+  } else {
+    foreach ($lockedUsers as $user) {
+      echo '<tr>';
+      echo '<td class="cell-name" data-label="Name">' . clean($user['full_name']) . '</td>';
+      echo '<td class="cell-email" data-label="Email">' . clean($user['email']) . '</td>';
+      echo '<td data-label="Role">' . clean(ucfirst($user['role'])) . '</td>';
+      echo '<td data-label="Login Attempts">' . (int) $user['login_attempts'] . '</td>';
+      echo '<td data-label="Locked Until">' . formatDate($user['locked_until']) . '</td>';
+      echo '<td class="cell-actions" data-label="Action"><div class="action-group"><a href="account_control.php?unlock_id=' . (int) $user['id'] . '" class="action-btn-small approve" onclick="return confirm(\'Are you sure you want to unlock this account?\')">Unlock</a></div></td>';
+      echo '</tr>';
+    }
+  }
+  exit;
+}
+?>
 
 <!DOCTYPE html>
 <html lang="en">
@@ -71,7 +91,7 @@
                 <th>Action</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody id="admin-locked-accounts" data-live-refresh="account_control.php?ajax=1&section=locked-accounts" data-live-target="#admin-locked-accounts">
               <?php if (empty($lockedUsers)): ?>
                 <tr>
                   <td colspan="6" class="empty-state">No locked accounts found.</td>
@@ -79,13 +99,15 @@
               <?php else: ?>
                 <?php foreach ($lockedUsers as $user): ?>
                   <tr>
-                    <td><?= clean($user['full_name']) ?></td>
-                    <td><?= clean($user['email']) ?></td>
-                    <td><?= clean(ucfirst($user['role'])) ?></td>
-                    <td><?= $user['login_attempts'] ?></td>
-                    <td><?= formatDate($user['locked_until']) ?></td>
-                    <td>
-                      <a href="account_control.php?unlock_id=<?= $user['id'] ?>" class="action-btn-small approve" onclick="return confirm('Are you sure you want to unlock this account?')">Unlock</a>
+                    <td class="cell-name" data-label="Name"><?= clean($user['full_name']) ?></td>
+                    <td class="cell-email" data-label="Email"><?= clean($user['email']) ?></td>
+                    <td data-label="Role"><?= clean(ucfirst($user['role'])) ?></td>
+                    <td data-label="Login Attempts"><?= $user['login_attempts'] ?></td>
+                    <td data-label="Locked Until"><?= formatDate($user['locked_until']) ?></td>
+                    <td class="cell-actions" data-label="Action">
+                      <div class="action-group">
+                        <a href="account_control.php?unlock_id=<?= $user['id'] ?>" class="action-btn-small approve" onclick="return confirm('Are you sure you want to unlock this account?')">Unlock</a>
+                      </div>
                     </td>
                   </tr>
                 <?php endforeach; ?>
@@ -149,6 +171,30 @@
         });
       });
     });
+
+    (function () {
+      const liveTargets = document.querySelectorAll('[data-live-refresh]');
+      liveTargets.forEach(function (node) {
+        const refreshUrl = node.dataset.liveRefresh;
+        const targetSelector = node.dataset.liveTarget || '#' + node.id;
+        const refreshSection = function () {
+          fetch(refreshUrl)
+            .then(function (response) { return response.text(); })
+            .then(function (html) {
+              const targetNode = document.querySelector(targetSelector);
+              if (targetNode) {
+                targetNode.innerHTML = html;
+              }
+            })
+            .catch(function (error) {
+              console.log('Account control live refresh failed:', error);
+            });
+        };
+
+        refreshSection();
+        setInterval(refreshSection, 8000);
+      });
+    })();
   </script>
 </body>
 </html>

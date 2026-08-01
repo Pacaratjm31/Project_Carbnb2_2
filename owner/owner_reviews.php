@@ -124,9 +124,9 @@ $reviews = get_owner_reviews($pdo, $owner['id']);
               <tbody>
                 <?php foreach ($reviews as $review): ?>
                   <tr>
-                    <td><?= clean($review['renter_name']) ?></td>
-                    <td><?= clean($review['vehicle_name'] ?: 'General Feedback') ?></td>
-                    <td>
+                    <td data-label="Renter"><?= clean($review['renter_name']) ?></td>
+                    <td data-label="Vehicle"><?= clean($review['vehicle_name'] ?: 'General Feedback') ?></td>
+                    <td data-label="Rating">
                       <?php if ($review['rating']): ?>
                         <?php for ($i = 1; $i <= 5; $i++): ?>
                           <?= $i <= $review['rating'] ? '★' : '☆' ?>
@@ -136,12 +136,14 @@ $reviews = get_owner_reviews($pdo, $owner['id']);
                         <em>No rating</em>
                       <?php endif; ?>
                     </td>
-                    <td><?= clean($review['comment'] ?: 'No comment') ?></td>
-                    <td><?= clean($review['feedback'] ?: 'No feedback') ?></td>
-                    <td><?= clean($review['reply'] ?: 'No reply yet') ?></td>
-                    <td><?= format_date($review['created_at']) ?></td>
-                    <td>
-                      <button class="action-btn" onclick="openReplyModal(<?= $review['id'] ?>, <?= htmlspecialchars(json_encode($review['renter_name']), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($review['comment'] ?? $review['feedback'] ?? ''), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($review['reply'] ?? ''), ENT_QUOTES) ?>)">Reply</button>
+                    <td data-label="Comment"><?= clean($review['comment'] ?: 'No comment') ?></td>
+                    <td data-label="Feedback"><?= clean($review['feedback'] ?: 'No feedback') ?></td>
+                    <td data-label="Reply"><?= clean($review['reply'] ?: 'No reply yet') ?></td>
+                    <td data-label="Date"><?= format_date($review['created_at']) ?></td>
+                    <td data-label="Action" class="cell-actions">
+                      <div class="action-group">
+                        <button class="action-btn" onclick="openReplyModal(<?= $review['id'] ?>, <?= htmlspecialchars(json_encode($review['renter_name']), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($review['comment'] ?? $review['feedback'] ?? ''), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($review['reply'] ?? ''), ENT_QUOTES) ?>)">Reply</button>
+                      </div>
                     </td>
                   </tr>
                 <?php endforeach; ?>

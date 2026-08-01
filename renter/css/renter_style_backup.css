@@ -1,21 +1,9 @@
 /* Profile-specific style overrides for view_profile.php */
 /* These styles differ from the main renter_style.css and are kept for compatibility */
 
-/* Note: .status-badge styles are now in renter_style.css (lines 257-264) */
-/* This file only contains overrides that differ from the main styles */
-
-.info-label {
-    color: #888;
-    font-size: 0.9rem;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-}
-
-.info-value {
-    font-size: 1.2rem;
-    margin-bottom: 20px;
-    color: #eee;
-}
+/* Note: .status-badge, .info-label, and .info-value are already defined in renter_style.css */
+/* (see .status-badge, .info-label, .info-value in that file) - removed here to avoid duplication. */
+/* This file now only contains styles that do NOT exist in renter_style.css. */
 
 /* Vehicle Details Page - Split Screen Layout */
 .vehicle-details-container {

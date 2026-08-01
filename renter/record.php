@@ -130,7 +130,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_feedback'])) {
 
 // Handle review submission removed - feature not working
 
-$stmt = $conn->prepare("SELECT b.id, b.start_date, b.end_date, b.total_price, b.status, v.name AS vehicle_name, v.owner_id FROM bookings b JOIN vehicles v ON b.vehicle_id = v.id WHERE b.renter_id = ? ORDER BY b.created_at DESC");
+$stmt = $conn->prepare("SELECT b.id, b.vehicle_id, b.start_date, b.end_date, b.total_price, b.status, v.name AS vehicle_name, v.owner_id FROM bookings b JOIN vehicles v ON b.vehicle_id = v.id WHERE b.renter_id = ? ORDER BY b.created_at DESC");
 $stmt->execute([$user_id]);
 $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -162,6 +162,52 @@ $stmt = $conn->prepare("
 ");
 $stmt->execute([$user_id]);
 $myReviews = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+$ajax = isset($_GET['ajax']) && $_GET['ajax'] === '1';
+if ($ajax && ($_GET['section'] ?? '') === 'booking-history') {
+    if (empty($bookings)) {
+        echo '<p>No rental history found.</p>';
+    } else {
+        foreach ($bookings as $b) {
+            echo '<div class="record-card">';
+            echo '<div class="record-info">';
+            echo '<p><strong>Car:</strong> ' . htmlspecialchars($b['vehicle_name']) . '</p>';
+            echo '<p><small>' . htmlspecialchars($b['start_date']) . ' → ' . htmlspecialchars($b['end_date']) . '</small></p>';
+            echo '<p><strong>Total:</strong> ₱' . number_format((float) $b['total_price'], 2) . '</p>';
+            echo '</div>';
+            echo '<span class="status status-' . strtolower($b['status']) . '">' . htmlspecialchars(ucfirst(str_replace('_', ' ', $b['status']))) . '</span>';
+            if ($b['status'] === 'approved') {
+                echo '<form method="POST" style="display:inline; margin-left:10px;" onsubmit="return confirm(\'Confirm that you have returned this car?\');">';
+                echo '<input type="hidden" name="booking_id" value="' . (int) $b['id'] . '">';
+                echo '<button type="submit" name="return_car" class="btn-small">Return Car</button>';
+                echo '</form>';
+            } elseif ($b['status'] === 'return_requested') {
+                echo '<span class="text-muted" style="margin-left:10px; font-size:0.9em;">Waiting for owner to inspect and mark vehicle available.</span>';
+            }
+            echo '</div>';
+        }
+    }
+    exit;
+}
+
+if ($ajax && ($_GET['section'] ?? '') === 'payment-history') {
+    if (empty($payments)) {
+        echo '<p>No payment records found.</p>';
+    } else {
+        foreach ($payments as $p) {
+            echo '<div class="record-card">';
+            echo '<div class="record-info">';
+            echo '<p><strong>Amount:</strong> ₱' . number_format((float) $p['amount'], 2) . '</p>';
+            echo '<span class="status payment-' . strtolower($p['payment_status']) . '">' . ucfirst($p['payment_status']) . '</span>';
+            echo '</div>';
+            if (!empty($p['receipt_image'])) {
+                echo '<a href="../uploads/payments/' . htmlspecialchars($p['receipt_image']) . '" target="_blank"><img src="../uploads/payments/' . htmlspecialchars($p['receipt_image']) . '" class="receipt-img"></a>';
+            }
+            echo '</div>';
+        }
+    }
+    exit;
+}
 
 // Display-only helper for booking status labels (handles multi-word
 // statuses like 'return_requested' -> "Return requested").
@@ -214,6 +260,7 @@ function booking_status_label(string $status): string {
         <p class="error-msg" style="color:#dc3545;"><?= htmlspecialchars($returnMsg) ?></p>
     <?php endif; ?>
 
+    <div id="renter-booking-history-content" data-live-refresh="record.php?ajax=1&section=booking-history" data-live-target="#renter-booking-history-content">
     <?php if (empty($bookings)): ?>
         <p>No rental history found.</p>
     <?php else: ?>
@@ -254,9 +301,11 @@ function booking_status_label(string $status): string {
             </div>
         <?php endforeach; ?>
     <?php endif; ?>
+    </div>
 
     <h3>Payment History</h3>
 
+    <div id="renter-payment-history-content" data-live-refresh="record.php?ajax=1&section=payment-history" data-live-target="#renter-payment-history-content">
     <?php if (empty($payments)): ?>
         <p>No payment records found.</p>
     <?php else: ?>
@@ -277,6 +326,7 @@ function booking_status_label(string $status): string {
             </div>
         <?php endforeach; ?>
     <?php endif; ?>
+    </div>
 
     <!-- Rate Your Experience section removed - feature not working -->
 
@@ -344,6 +394,32 @@ function booking_status_label(string $status): string {
     <?php endif; ?>
 
 </div>
+
+<script>
+(function () {
+  const refreshNodes = document.querySelectorAll('[data-live-refresh]');
+  refreshNodes.forEach(function (node) {
+    const refreshUrl = node.dataset.liveRefresh;
+    const targetSelector = node.dataset.liveTarget || '#' + node.id;
+    const refreshSection = function () {
+      fetch(refreshUrl)
+        .then(function (response) { return response.text(); })
+        .then(function (html) {
+          const targetNode = document.querySelector(targetSelector);
+          if (targetNode) {
+            targetNode.innerHTML = html;
+          }
+        })
+        .catch(function (error) {
+          console.log('Records refresh failed:', error);
+        });
+    };
+
+    refreshSection();
+    setInterval(refreshSection, 8000);
+  });
+})();
+</script>
 
 </body>
 </html>

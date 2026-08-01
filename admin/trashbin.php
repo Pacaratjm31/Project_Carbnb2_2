@@ -1,4 +1,23 @@
-<?php require_once 'trashbin_logic.php'; ?>
+<?php require_once 'trashbin_logic.php'; 
+
+$ajax = isset($_GET['ajax']) && $_GET['ajax'] === '1';
+if ($ajax && ($_GET['section'] ?? '') === 'deleted-users') {
+  if (empty($deletedUsers)) {
+    echo '<tr><td colspan="5" class="empty-state">No deleted users found.</td></tr>';
+  } else {
+    foreach ($deletedUsers as $user) {
+      echo '<tr>';
+      echo '<td class="cell-name" data-label="Name">' . clean($user['full_name']) . '</td>';
+      echo '<td class="cell-email" data-label="Email">' . clean($user['email']) . '</td>';
+      echo '<td data-label="Role">' . clean(ucfirst($user['role'])) . '</td>';
+      echo '<td data-label="Deleted Date">' . formatDate($user['deleted_at']) . '</td>';
+      echo '<td class="cell-actions" data-label="Action"><div class="action-group"><a href="trashbin.php?restore_id=' . (int) $user['id'] . '" class="action-btn-small approve" onclick="return confirm(\'Are you sure you want to restore this user?\')">Restore</a><a href="trashbin.php?permanent_delete_id=' . (int) $user['id'] . '" class="action-btn-small reject" onclick="return confirm(\'Are you sure you want to permanently delete this user? This action cannot be undone.\')">Delete Permanently</a></div></td>';
+      echo '</tr>';
+    }
+  }
+  exit;
+}
+?>
 
 <!DOCTYPE html>
 <html lang="en">
@@ -70,7 +89,7 @@
                 <th>Action</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody id="admin-deleted-users-table" data-live-refresh="trashbin.php?ajax=1&section=deleted-users" data-live-target="#admin-deleted-users-table">
               <?php if (empty($deletedUsers)): ?>
                 <tr>
                   <td colspan="5" class="empty-state">No deleted users found.</td>
@@ -78,13 +97,15 @@
               <?php else: ?>
                 <?php foreach ($deletedUsers as $user): ?>
                   <tr>
-                    <td><?= clean($user['full_name']) ?></td>
-                    <td><?= clean($user['email']) ?></td>
-                    <td><?= clean(ucfirst($user['role'])) ?></td>
-                    <td><?= formatDate($user['deleted_at']) ?></td>
-                    <td>
-                      <a href="trashbin.php?restore_id=<?= $user['id'] ?>" class="action-btn-small approve" onclick="return confirm('Are you sure you want to restore this user?')">Restore</a>
-                      <a href="trashbin.php?permanent_delete_id=<?= $user['id'] ?>" class="action-btn-small reject" onclick="return confirm('Are you sure you want to permanently delete this user? This action cannot be undone.')">Delete Permanently</a>
+                    <td class="cell-name" data-label="Name"><?= clean($user['full_name']) ?></td>
+                    <td class="cell-email" data-label="Email"><?= clean($user['email']) ?></td>
+                    <td data-label="Role"><?= clean(ucfirst($user['role'])) ?></td>
+                    <td data-label="Deleted Date"><?= formatDate($user['deleted_at']) ?></td>
+                    <td class="cell-actions" data-label="Action">
+                      <div class="action-group">
+                        <a href="trashbin.php?restore_id=<?= $user['id'] ?>" class="action-btn-small approve" onclick="return confirm('Are you sure you want to restore this user?')">Restore</a>
+                        <a href="trashbin.php?permanent_delete_id=<?= $user['id'] ?>" class="action-btn-small reject" onclick="return confirm('Are you sure you want to permanently delete this user? This action cannot be undone.')">Delete Permanently</a>
+                      </div>
                     </td>
                   </tr>
                 <?php endforeach; ?>
@@ -141,6 +162,30 @@
         });
       });
     });
+
+    (function () {
+      const liveTargets = document.querySelectorAll('[data-live-refresh]');
+      liveTargets.forEach(function (node) {
+        const refreshUrl = node.dataset.liveRefresh;
+        const targetSelector = node.dataset.liveTarget || '#' + node.id;
+        const refreshSection = function () {
+          fetch(refreshUrl)
+            .then(function (response) { return response.text(); })
+            .then(function (html) {
+              const targetNode = document.querySelector(targetSelector);
+              if (targetNode) {
+                targetNode.innerHTML = html;
+              }
+            })
+            .catch(function (error) {
+              console.log('Trash bin live refresh failed:', error);
+            });
+        };
+
+        refreshSection();
+        setInterval(refreshSection, 8000);
+      });
+    })();
   </script>
 </body>
 </html>

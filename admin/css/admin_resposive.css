@@ -1,0 +1,446 @@
+/* ==========================================================================
+   Carbnb Admin — Responsive Layer (Phase 1)
+   Scope: dashboard.php, manage_users.php, verify_vehicles.php
+   Purpose: Tablet + Mobile only. Desktop (>=1024px) is untouched.
+   This file only ADDS rules inside max-width media queries and reuses
+   existing selectors/classes/CSS variables from admin_style.css —
+   it does not redefine colors or rewrite the base layout.
+   Breakpoints: 992 / 768 / 576 / 480 (desktop stays intact from 1024 up)
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   TABLET (1023px and below)
+   -------------------------------------------------------------------------- */
+@media (max-width: 1023px) {
+  .page {
+    padding: 16px;
+  }
+
+  .card {
+    padding: 16px;
+  }
+
+  .hero-card {
+    padding: 18px;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+
+  .vehicle-card {
+    padding: 16px;
+    gap: 16px;
+  }
+
+  /* Phase 2: earnings.php summary grid uses an inline
+     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)),
+     which on tablet widths can still lay out 3+ columns. Cap it at 2
+     to match the "grids become 2 columns" tablet rule. !important is
+     required because inline styles otherwise outrank this stylesheet. */
+  #admin-earnings-summary {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* Off-canvas sidebar (matches the .open / .show classes already
+     toggled by the existing JS on every page in this phase). If the
+     base stylesheet already implements this, these rules simply agree
+     with it; if not, this is what makes the toggle actually work. */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    width: min(280px, 80vw);
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    z-index: 1000;
+    overflow-y: auto;
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 900;
+  }
+
+  .overlay.show {
+    display: block;
+  }
+
+  .main-content {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  body.sidebar-open {
+    overflow: hidden;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   MOBILE (767px and below) — real stacked-card redesign
+   -------------------------------------------------------------------------- */
+@media (max-width: 767px) {
+  body {
+    overflow-x: hidden;
+  }
+
+  .main-content,
+  .page {
+    max-width: 100%;
+    overflow-x: hidden;
+    padding: 12px;
+  }
+
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+
+  .card {
+    padding: 14px;
+    border-radius: 12px;
+  }
+
+  /* Hero sections stack vertically */
+  .hero-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .hero-card h2 {
+    font-size: 1.2rem;
+  }
+
+  .hero-card .topbar-action {
+    width: 100%;
+    text-align: center;
+  }
+
+  /* Stat boxes: one per row */
+  .stats-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .stat-box {
+    padding: 16px;
+  }
+
+  /* Quick action buttons: full width, stacked */
+  .quick-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .quick-actions .action-btn {
+    width: 100%;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* ---- Tables -> stacked cards -----------------------------------------
+     Every <td> in these pages already carries data-label="...", so this
+     is a pure-CSS conversion — no HTML/PHP structural changes needed. */
+  .table-wrapper {
+    overflow-x: visible;
+  }
+
+  table.table thead {
+    display: none;
+  }
+
+  table.table,
+  table.table tbody,
+  table.table tr,
+  table.table td {
+    display: block;
+    width: 100%;
+  }
+
+  table.table tr {
+    background: var(--panel-2, var(--panel));
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 14px;
+  }
+
+  table.table td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    text-align: right;
+    padding: 8px 0;
+    border: none;
+    border-bottom: 1px solid var(--border);
+  }
+
+  table.table td:last-child {
+    border-bottom: none;
+  }
+
+  table.table td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: var(--muted);
+    text-align: left;
+    margin-right: 12px;
+    flex-shrink: 0;
+  }
+
+  /* Empty-state row (colspan) shouldn't get the label/flex treatment */
+  table.table td.empty-state {
+    display: block;
+    text-align: center;
+    padding: 16px 0;
+  }
+
+  table.table td.empty-state::before {
+    content: none;
+  }
+
+  /* Action cells: buttons/links/forms stack and go full width */
+  table.table td.cell-actions {
+    justify-content: flex-start;
+    align-items: stretch;
+  }
+
+  table.table td.cell-actions::before {
+    display: none;
+  }
+
+  table.table .action-group {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  table.table .action-group > a,
+  table.table .action-group > button,
+  table.table .action-group > form {
+    width: 100%;
+  }
+
+  table.table .action-group form button {
+    width: 100%;
+  }
+
+  /* Buttons in general: comfortable tap targets */
+  .action-btn-small,
+  .view-docs-btn {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+
+  /* ---- Vehicle cards (verify_vehicles.php) ------------------------------
+     Image on top, details below, actions stacked full width. */
+  .vehicle-card {
+    display: flex;
+    flex-direction: column;
+    padding: 14px;
+    gap: 14px;
+  }
+
+  .vehicle-image,
+  .vehicle-details,
+  .vehicle-actions {
+    width: 100%;
+  }
+
+  .vehicle-image img,
+  .vehicle-image .no-image {
+    width: 100%;
+    height: auto;
+    max-height: 220px;
+    object-fit: cover;
+    border-radius: 10px;
+  }
+
+  .vehicle-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .vehicle-actions form,
+  .vehicle-actions button,
+  .vehicle-actions .action-btn-small {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  /* Nested info-table inside vehicle-details: label above value */
+  table.info-table,
+  table.info-table tbody,
+  table.info-table tr,
+  table.info-table th,
+  table.info-table td {
+    display: block;
+    width: 100%;
+  }
+
+  table.info-table tr {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+  }
+
+  table.info-table th {
+    color: var(--muted);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 0 0 4px 0;
+  }
+
+  table.info-table td {
+    padding: 0;
+  }
+
+  /* Document verification modal (manage_users.php) */
+  .doc-modal-content {
+    margin: 16px;
+    max-width: calc(100% - 32px);
+    padding: 16px;
+  }
+
+  .doc-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .doc-modal-header h3 {
+    font-size: 16px;
+  }
+
+  /* Generic modal (shared component, used elsewhere too) */
+  .modal-content {
+    width: calc(100% - 32px);
+    margin: 16px auto;
+    padding: 16px;
+  }
+
+  .modal-content textarea,
+  .modal-content input,
+  .modal-content select {
+    width: 100%;
+  }
+
+  .modal-content button,
+  .modal-content .btn-primary,
+  .modal-content .action-btn-small {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  /* Phase 2: earnings.php summary grid (inline style) -> 1 column.
+     !important needed to beat the inline grid-template-columns. */
+  #admin-earnings-summary {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  /* Phase 2: earnings.php revenue chart must never exceed its card
+     width. Chart.js sizes the canvas via its own JS, so we constrain
+     the rendered element itself rather than relying on the inline
+     max-height alone. */
+  #chart {
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  /* Phase 2: contact_messages.php "Send Message to User" form uses an
+     inline 2-column grid -> stack to 1 column on phones so the select
+     and textarea each get full width. !important beats the inline
+     grid-template-columns. */
+  .form-grid-2 {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  /* Phase 2: form controls (the user <select> and message <textarea>
+     in contact_messages.php) fit the screen width with no overflow. */
+  .form-control {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* Phase 2: the standalone "Send Message" button sits outside any
+     table, so Phase 1's table-scoped full-width rule doesn't reach
+     it. Scoped to its form id so no other button is affected. */
+  #sendMessageForm .action-btn-small {
+    width: 100%;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   SMALL PHONE (575px and below)
+   -------------------------------------------------------------------------- */
+@media (max-width: 575px) {
+  .page,
+  .main-content {
+    padding: 10px;
+  }
+
+  .card {
+    padding: 12px;
+  }
+
+  table.table tr {
+    padding: 10px 12px;
+  }
+
+  .stat-box h3 {
+    font-size: 13px;
+  }
+
+  .stat-box p {
+    font-size: 1.4rem;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   EXTRA-SMALL PHONE (479px and below)
+   -------------------------------------------------------------------------- */
+@media (max-width: 479px) {
+  .hero-card h2 {
+    font-size: 1.05rem;
+  }
+
+  table.table td {
+    flex-wrap: wrap;
+  }
+
+  table.table td::before {
+    flex-basis: 100%;
+    margin-bottom: 2px;
+  }
+
+  table.table td {
+    text-align: left;
+  }
+}
+
