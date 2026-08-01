@@ -46,6 +46,7 @@ if ($ajax && ($_GET['section'] ?? '') === 'deleted-users') {
       <a href="contact_messages.php">Contact Messages</a>
       <a href="delete_user.php">Delete Users</a>
       <a href="trashbin.php" class="active">Trash Bin</a>
+      <a href="location_tracker.php">Renter Tracker</a>
       <a href="../auth/logout.php" class="topbar-action" style="display:block; margin-top:1rem; text-align:center;">Logout</a>
     </nav>
   </aside>

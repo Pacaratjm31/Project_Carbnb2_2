@@ -107,17 +107,32 @@ $total_reviews = (int) $rating_stats['total_reviews'];
 </head>
 <body>
     <div class="top-nav">
-        <div class="nav-left">
-            <h2>Carbnb</h2>
-        </div>
-        <div class="nav-right">
-            <a href="browse.php" class="nav-all-cars">All Cars</a>
-            <a href="record.php" class="nav-my-records">My Records</a>
-            <a href="view_profile.php" class="nav-my-profile">My Profile</a>
-            <a href="renter_messages.php" class="nav-my-messages">Messages</a>
-            <a href="../auth/logout.php" class="logout-link">Logout</a>
-        </div>
+
+    <div class="nav-left">
+        <h2>Carbnb</h2>
     </div>
+
+    <!-- Mobile Menu Button -->
+    <button id="mobileMenuBtn" class="mobile-menu-btn">
+        ☰ Menu
+    </button>
+
+    <!-- Navigation -->
+    <div class="nav-right" id="mobileMenu">
+
+        <a href="browse.php" class="nav-all-cars">All Cars</a>
+
+        <a href="record.php" class="nav-my-records">My Records</a>
+
+        <a href="view_profile.php" class="nav-my-profile">My Profile</a>
+
+        <a href="renter_messages.php" class="nav-my-messages">Messages</a>
+
+        <a href="../auth/logout.php" class="logout-link">Logout</a>
+
+    </div>
+
+</div>
 
     <div class="header-text">
         <h1><span class="blue">Rate &</span> <span class="orange">Comment</span></h1>
@@ -198,32 +213,96 @@ $total_reviews = (int) $rating_stats['total_reviews'];
     </div>
 
     <script>
-        // Star rating hover effect
-        document.addEventListener('DOMContentLoaded', function() {
-            const stars = document.querySelectorAll('.star-rating input');
-            const labels = document.querySelectorAll('.star-rating label');
-            
-            labels.forEach((label, index) => {
-                label.addEventListener('mouseover', function() {
-                    const starValue = 5 - index;
-                    labels.forEach((l, i) => {
-                        l.style.color = (5 - i) <= starValue ? '#ffd700' : '#444';
-                    });
-                });
-                
-                label.addEventListener('mouseout', function() {
-                    const checked = document.querySelector('.star-rating input:checked');
-                    if (checked) {
-                        const checkedValue = parseInt(checked.value);
-                        labels.forEach((l, i) => {
-                            l.style.color = (5 - i) <= checkedValue ? '#ffd700' : '#444';
-                        });
-                    } else {
-                        labels.forEach(l => l.style.color = '#444');
-                    }
-                });
-            });
+      document.addEventListener("DOMContentLoaded", function () {
+
+    // ===============================
+    // Mobile Menu
+    // ===============================
+
+    const mobileMenuBtn = document.getElementById("mobileMenuBtn");
+    const mobileMenu = document.getElementById("mobileMenu");
+
+    if (mobileMenuBtn && mobileMenu) {
+
+        mobileMenuBtn.addEventListener("click", function () {
+
+            mobileMenu.classList.toggle("show");
+
         });
-    </script>
+
+        document.addEventListener("click", function (e) {
+
+            if (
+                !mobileMenu.contains(e.target) &&
+                !mobileMenuBtn.contains(e.target)
+            ) {
+
+                mobileMenu.classList.remove("show");
+
+            }
+
+        });
+
+    }
+
+    // ===============================
+    // Star Rating
+    // ===============================
+
+    const stars = document.querySelectorAll(".star-rating input");
+    const labels = document.querySelectorAll(".star-rating label");
+
+    labels.forEach(function(label, index){
+
+        label.addEventListener("mouseover", function(){
+
+            const value = 5 - index;
+
+            labels.forEach(function(item, i){
+
+                item.style.color =
+                    (5 - i) <= value
+                    ? "#ffd700"
+                    : "#444";
+
+            });
+
+        });
+
+        label.addEventListener("mouseout", function(){
+
+            const checked =
+                document.querySelector(".star-rating input:checked");
+
+            if(checked){
+
+                const value = parseInt(checked.value);
+
+                labels.forEach(function(item,i){
+
+                    item.style.color =
+                        (5 - i) <= value
+                        ? "#ffd700"
+                        : "#444";
+
+                });
+
+            }
+            else{
+
+                labels.forEach(function(item){
+
+                    item.style.color="#444";
+
+                });
+
+            }
+
+        });
+
+    });
+
+});
+</script>
 </body>
 </html>

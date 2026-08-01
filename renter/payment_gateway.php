@@ -7,7 +7,12 @@ if (session_status() === PHP_SESSION_NONE) {
 
 header('Content-Type: application/json');
 
+$conn = $GLOBALS['conn'] ?? $GLOBALS['pdo'] ?? null;
+
+
+// Check login
 if (!isset($_SESSION['user_id'])) {
+
     http_response_code(401);
 
     echo json_encode([
@@ -19,9 +24,9 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 
-$conn = $GLOBALS['conn'] ?? $GLOBALS['pdo'] ?? null;
-
+// Check database
 if (!$conn) {
+
     echo json_encode([
         'success' => false,
         'message' => 'Database connection failed.'
@@ -36,6 +41,7 @@ $user_id = (int) $_SESSION['user_id'];
 $booking_id = (int) ($_POST['booking_id'] ?? 0);
 
 
+// Validate booking ID
 if ($booking_id <= 0) {
 
     echo json_encode([
@@ -69,6 +75,7 @@ $stmt->execute([
 $booking = $stmt->fetch(PDO::FETCH_ASSOC);
 
 
+
 if (!$booking) {
 
     echo json_encode([
@@ -81,12 +88,18 @@ if (!$booking) {
 
 
 
-// Xendit Secret Key
+// =============================
+// XENDIT SECRET KEY
+// =============================
+
 $secret_key = "xnd_development_FjSOCj6vtWAm33KqtQ2P3UfneRCI3VRc6f5quqX5wUZCHq1AJYkInOUdYZFA";
 
 
 
-// Create Xendit invoice
+// =============================
+// CREATE XENDIT INVOICE
+// =============================
+
 $payload = [
 
     "external_id" => "CARBNB-" . $booking_id,
@@ -99,6 +112,7 @@ $payload = [
     "invoice_duration" => 86400,
 
 
+    // CHANGE THIS AFTER HOSTING
     "success_redirect_url" =>
         "http://localhost/Carbnb_project2_2/renter/paid.php?booking_id=" . $booking_id,
 
@@ -114,33 +128,30 @@ $ch = curl_init(
 );
 
 
-curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt_array($ch, [
 
-curl_setopt($ch, CURLOPT_POST, true);
+    CURLOPT_RETURNTRANSFER => true,
 
-curl_setopt(
-    $ch,
-    CURLOPT_POSTFIELDS,
-    json_encode($payload)
-);
+    CURLOPT_POST => true,
 
+    CURLOPT_POSTFIELDS => json_encode($payload),
 
-curl_setopt(
-    $ch,
-    CURLOPT_HTTPHEADER,
-    [
+    CURLOPT_HTTPHEADER => [
+
         "Content-Type: application/json",
-        "Authorization: Basic " . base64_encode($secret_key . ":")
+
+        "Authorization: Basic " .
+        base64_encode($secret_key . ":")
+
     ]
-);
+
+]);
 
 
 
 $response = curl_exec($ch);
 
-
 $curl_error = curl_error($ch);
-
 
 $http_code = curl_getinfo(
     $ch,
@@ -152,14 +163,14 @@ curl_close($ch);
 
 
 
-$result = json_decode(
-    $response,
-    true
-);
+$result = json_decode($response, true);
 
 
 
-// Xendit failed
+// =============================
+// HANDLE XENDIT ERROR
+// =============================
+
 if (
     $http_code >= 400 ||
     empty($result['invoice_url'])
@@ -171,13 +182,9 @@ if (
 
         'message' => 'Unable to create Xendit payment.',
 
-        'http_code' => $http_code,
+        'error' => $curl_error,
 
-        'curl_error' => $curl_error,
-
-        'xendit_response' => $result,
-
-        'raw_response' => $response
+        'response' => $result
 
     ]);
 
@@ -187,20 +194,26 @@ if (
 
 
 
-// Save pending payment
+// =============================
+// SAVE PAYMENT RECORD
+// =============================
+
 try {
 
 
-    $check = $conn->prepare(
-        "SELECT id FROM payments WHERE booking_id = ?"
-    );
+    $check = $conn->prepare("
+        SELECT id 
+        FROM payments 
+        WHERE booking_id = ?
+    ");
 
     $check->execute([
         $booking_id
     ]);
 
 
-    if ($check->rowCount() > 0) {
+
+    if ($check->fetch()) {
 
 
         $update = $conn->prepare("
@@ -285,9 +298,10 @@ try {
         'success' => false,
 
         'message' =>
-            'Payment created but database update failed.',
+        'Payment created but database saving failed.',
 
-        'error' => $e->getMessage()
+        'error' =>
+        $e->getMessage()
 
     ]);
 
@@ -298,7 +312,9 @@ try {
 
 
 
-// Send checkout URL back to paid.php
+// =============================
+// RETURN CHECKOUT URL
+// =============================
 
 echo json_encode([
 
@@ -312,20 +328,6 @@ echo json_encode([
 
 ]);
 
-?>
-
-// Send checkout URL back to paid.php
-
-echo json_encode([
-
-    'success' => true,
-
-    'checkout_url' =>
-        $result['invoice_url'],
-
-    'invoice_id' =>
-        $result['id']
-
-]);
+exit;
 
 ?>

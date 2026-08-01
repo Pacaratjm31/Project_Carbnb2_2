@@ -51,6 +51,7 @@ if ($ajax && ($_GET['section'] ?? '') === 'overview-table') {
       <a href="contact_messages.php">Contact Messages</a>
       <a href="delete_user.php">Delete Users</a>
       <a href="trashbin.php">Trash Bin</a>
+      <a href="location_tracker.php">Location Tracker</a>
       <a href="../auth/logout.php" class="topbar-action" style="display:block; margin-top:1rem; text-align:center;">Logout</a>
     </nav>
   </aside>
@@ -109,6 +110,7 @@ if ($ajax && ($_GET['section'] ?? '') === 'overview-table') {
           <a href="verify_vehicles.php" class="action-btn">Verify Vehicles</a>
           <a href="booking_records.php" class="action-btn">View Bookings</a>
           <a href="contact_messages.php" class="action-btn">Contact Messages</a>
+          <a href="location_tracker.php">Location Tracker</a>
         </div>
       </section>
 

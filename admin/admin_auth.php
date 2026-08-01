@@ -1,11 +1,23 @@
 <?php
 // Admin Authentication and Shared Functions
+
 session_start();
+
 require_once __DIR__ . '/../database/db.php';
 
-/* ==========================================================
-   ADMIN SECURITY - Check if user is logged in as admin
-   ========================================================== */
+
+// ==========================================================
+// VERIFY DATABASE CONNECTION
+// ==========================================================
+
+if (!isset($pdo)) {
+    die("Database connection was not loaded.");
+}
+
+
+// ==========================================================
+// ADMIN SECURITY - Check if user is logged in as admin
+// ==========================================================
 
 if (
     !isset($_SESSION['user_id']) ||
@@ -16,15 +28,17 @@ if (
     exit;
 }
 
-/* ==========================================================
-   CURRENT PAGE
-   ========================================================== */
+
+// ==========================================================
+// CURRENT PAGE
+// ==========================================================
 
 $currentPage = basename($_SERVER['PHP_SELF']);
 
-/* ==========================================================
-   GLOBAL MESSAGES
-   ========================================================== */
+
+// ==========================================================
+// GLOBAL MESSAGES
+// ==========================================================
 
 $success = '';
 $error = '';
@@ -37,27 +51,28 @@ if (isset($_GET['error'])) {
     $error = trim($_GET['error']);
 }
 
-/* ==========================================================
-   SHARED FUNCTIONS
-   ========================================================== */
+
+// ==========================================================
+// SHARED FUNCTIONS
+// ==========================================================
 
 function redirectSuccess($page, $message)
 {
     header(
-        "Location: {$page}?success=" .
-        urlencode($message)
+        "Location: {$page}?success=" . urlencode($message)
     );
     exit;
 }
 
+
 function redirectError($page, $message)
 {
     header(
-        "Location: {$page}?error=" .
-        urlencode($message)
+        "Location: {$page}?error=" . urlencode($message)
     );
     exit;
 }
+
 
 function clean($value)
 {
@@ -68,36 +83,58 @@ function clean($value)
     );
 }
 
+
 function formatDate($date)
 {
-    return $date ? date('M d, Y', strtotime($date)) : '—';
+    return $date
+        ? date('M d, Y', strtotime($date))
+        : '—';
 }
+
 
 function statusBadgeClass($status)
 {
     return match ($status) {
+
         'approved' => 'available',
+
         'pending' => 'pending',
+
         'disapproved' => 'active',
+
         'available' => 'available',
+
         'rented' => 'active',
+
         'maintenance' => 'pending',
+
         'completed' => 'available',
+
         default => 'pending',
     };
 }
 
+
 function statusLabel($status)
 {
     return match ($status) {
+
         'approved' => 'Approved',
+
         'pending' => 'Pending',
+
         'disapproved' => 'Disapproved',
+
         'available' => 'Available',
+
         'rented' => 'Rented',
+
         'maintenance' => 'Maintenance',
+
         'completed' => 'Completed',
+
         default => ucfirst($status),
     };
 }
+
 ?>

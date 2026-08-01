@@ -259,105 +259,434 @@ if ($ajax && ($_GET['section'] ?? '') === 'payment-status') {
 
     <?php if ($paymentStatus !== 'verified' && $paymentStatus !== 'pending'): ?>
     <script>
-        function refreshPaymentStatus() {
-            const paymentStatusNode = document.getElementById('renter-payment-status');
-            if (!paymentStatusNode || !paymentStatusNode.dataset.liveRefresh) {
-                return;
-            }
 
-            fetch(paymentStatusNode.dataset.liveRefresh)
-                .then(function (response) { return response.text(); })
-                .then(function (html) {
-                    paymentStatusNode.innerHTML = html;
-                })
-                .catch(function (error) {
-                    console.log('Payment status refresh failed:', error);
-                });
+function refreshPaymentStatus() {
+
+    const paymentStatusNode = document.getElementById('renter-payment-status');
+
+    if (!paymentStatusNode || !paymentStatusNode.dataset.liveRefresh) {
+        return;
+    }
+
+
+    fetch(paymentStatusNode.dataset.liveRefresh)
+
+        .then(function(response) {
+            return response.text();
+        })
+
+        .then(function(html) {
+
+            paymentStatusNode.innerHTML = html;
+
+        })
+
+        .catch(function(error) {
+
+            console.log(
+                'Payment status refresh failed:',
+                error
+            );
+
+        });
+
+}
+
+
+
+
+// XENDIT BUTTON (Event Delegation)
+// Works even after AJAX refresh
+
+document.addEventListener(
+'click',
+async function(e) {
+
+
+    if (
+        e.target &&
+        e.target.id === 'payWithXendit'
+    ) {
+
+
+        const button = e.target;
+
+
+
+        // Open new tab immediately
+        const xenditWindow =
+            window.open(
+                '',
+                '_blank'
+            );
+
+
+
+        if (!xenditWindow) {
+
+
+            alert(
+                'Please allow popups for this website.'
+            );
+
+
+            return;
+
         }
 
-        document.getElementById('payWithXendit')?.addEventListener('click', async function () {
-            const formData = new FormData();
-            formData.append('booking_id', '<?= (int) $booking_id ?>');
 
-            try {
-                const response = await fetch('payment_gateway.php', {
-                    method: 'POST',
-                    body: formData
-                });
 
-                const result = await response.json();
+        button.disabled = true;
 
-                if (result.success && result.checkout_url) {
-                    window.open(result.checkout_url, '_blank');
-                } else {
-                    alert(result.message || 'Unable to start Xendit payment.');
-                }
-            } catch (error) {
-                console.error(error);
-                alert('Xendit payment could not be started.');
+        button.textContent =
+            'Connecting to Xendit...';
+
+
+
+        const formData =
+            new FormData();
+
+
+
+        formData.append(
+            'booking_id',
+            '<?= (int) $booking_id ?>'
+        );
+
+
+
+
+        try {
+
+
+            const response =
+                await fetch(
+                    'payment_gateway.php',
+                    {
+                        method: 'POST',
+                        body: formData
+                    }
+                );
+
+
+
+            const text =
+                await response.text();
+
+
+
+            console.log(
+                'Xendit Response:',
+                text
+            );
+
+
+
+            const result =
+                JSON.parse(text);
+
+
+
+
+            if (
+                result.success &&
+                result.checkout_url
+            ) {
+
+
+                xenditWindow.location.href =
+                    result.checkout_url;
+
+
+
+            } else {
+
+
+                xenditWindow.close();
+
+
+
+                alert(
+                    result.message ||
+                    'Unable to create Xendit payment.'
+                );
+
+
             }
-        });
 
-        document.getElementById('manualPaymentForm')?.addEventListener('submit', async function (e) {
-            e.preventDefault();
 
-            const submitBtn = document.getElementById('submitPaymentBtn');
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Submitting...';
 
-            const formData = new FormData(this);
-            formData.append('booking_id', '<?= (int) $booking_id ?>');
 
-            try {
-                const response = await fetch('payment_api.php', {
-                    method: 'POST',
-                    body: formData
-                });
+        } catch(error) {
 
-                const result = await response.json();
 
-                if (result.success) {
-                    alert(result.message || 'Payment submitted. Waiting for admin verification.');
-                    refreshPaymentStatus();
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = 'Submit Payment';
-                } else {
-                    alert(result.message || 'Unable to submit payment.');
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = 'Submit Payment';
-                }
-            } catch (error) {
-                console.error(error);
-                alert('Payment submission failed.');
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Submit Payment';
+            console.error(
+                'Xendit Error:',
+                error
+            );
+
+
+
+            xenditWindow.close();
+
+
+
+            alert(
+                'Xendit payment connection failed.'
+            );
+
+
+
+        }
+
+
+
+        button.disabled = false;
+
+        button.textContent =
+            'Pay with Xendit';
+
+
+
+    }
+
+
+});
+
+
+
+
+
+// MANUAL PAYMENT UPLOAD
+
+document.addEventListener(
+'submit',
+async function(e) {
+
+
+    if (
+        e.target &&
+        e.target.id === 'manualPaymentForm'
+    ) {
+
+
+        e.preventDefault();
+
+
+
+        const form =
+            e.target;
+
+
+
+        const submitBtn =
+            document.getElementById(
+                'submitPaymentBtn'
+            );
+
+
+
+        submitBtn.disabled = true;
+
+        submitBtn.textContent =
+            'Submitting...';
+
+
+
+
+        const formData =
+            new FormData(form);
+
+
+
+        formData.append(
+            'booking_id',
+            '<?= (int) $booking_id ?>'
+        );
+
+
+
+
+        try {
+
+
+            const response =
+                await fetch(
+                    'payment_api.php',
+                    {
+                        method: 'POST',
+                        body: formData
+                    }
+                );
+
+
+
+            const result =
+                await response.json();
+
+
+
+
+            if(result.success) {
+
+
+                alert(
+                    result.message ||
+                    'Payment submitted.'
+                );
+
+
+                refreshPaymentStatus();
+
+
+
+            } else {
+
+
+                alert(
+                    result.message ||
+                    'Unable to submit payment.'
+                );
+
+
             }
-        });
 
-        (function () {
-            const liveTargets = document.querySelectorAll('[data-live-refresh]');
-            liveTargets.forEach(function (node) {
-                const refreshUrl = node.dataset.liveRefresh;
-                const targetSelector = node.dataset.liveTarget || '#' + node.id;
-                const refreshSection = function () {
-                    fetch(refreshUrl)
-                        .then(function (response) { return response.text(); })
-                        .then(function (html) {
-                            const targetNode = document.querySelector(targetSelector);
-                            if (targetNode) {
-                                targetNode.innerHTML = html;
-                            }
-                        })
-                        .catch(function (error) {
-                            console.log('Live refresh failed:', error);
-                        });
-                };
 
-                refreshSection();
-                setInterval(refreshSection, 8000);
+
+        } catch(error) {
+
+
+            console.error(error);
+
+
+            alert(
+                'Payment submission failed.'
+            );
+
+
+        }
+
+
+
+
+        submitBtn.disabled = false;
+
+        submitBtn.textContent =
+            'Submit Payment';
+
+
+
+    }
+
+
+});
+
+
+
+
+
+
+// AUTO PAYMENT STATUS REFRESH
+
+(function(){
+
+
+    const liveTargets =
+        document.querySelectorAll(
+            '[data-live-refresh]'
+        );
+
+
+
+    liveTargets.forEach(
+    function(node){
+
+
+
+        const refreshUrl =
+            node.dataset.liveRefresh;
+
+
+
+        const targetSelector =
+            node.dataset.liveTarget ||
+            '#' + node.id;
+
+
+
+
+        function refreshSection(){
+
+
+
+            fetch(refreshUrl)
+
+
+            .then(function(response){
+
+                return response.text();
+
+            })
+
+
+            .then(function(html){
+
+
+                const targetNode =
+                    document.querySelector(
+                        targetSelector
+                    );
+
+
+
+                if(targetNode){
+
+                    targetNode.innerHTML =
+                        html;
+
+                }
+
+
+
+            })
+
+
+            .catch(function(error){
+
+
+                console.log(
+                    'Live refresh failed:',
+                    error
+                );
+
+
             });
-        })();
-    </script>
+
+
+        }
+
+
+
+
+        refreshSection();
+
+
+
+        setInterval(
+            refreshSection,
+            8000
+        );
+
+
+
+    });
+
+
+
+})();
+
+
+</script>
     <?php endif; ?>
 
 </body>

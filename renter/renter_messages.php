@@ -352,17 +352,32 @@ if ($ajax && ($_GET['section'] ?? '') === 'inspection-list') {
 </head>
 <body>
     <div class="top-nav">
-        <div class="nav-left">
-            <h2>Carbnb</h2>
-        </div>
-        <div class="nav-right">
-            <a href="browse.php" class="nav-all-cars">All Cars</a>
-            <a href="record.php" class="nav-my-records">My Records</a>
-            <a href="view_profile.php" class="nav-my-profile">My Profile</a>
-            <a href="renter_messages.php" class="nav-my-messages active">Messages</a>
-            <a href="../auth/logout.php" class="logout-link">Logout</a>
-        </div>
+
+    <div class="nav-left">
+        <h2>Carbnb</h2>
     </div>
+
+    <!-- Mobile Menu Button -->
+    <button id="mobileMenuBtn" class="mobile-menu-btn">
+        ☰ Menu
+    </button>
+
+    <!-- Navigation -->
+    <div class="nav-right" id="mobileMenu">
+
+        <a href="browse.php" class="nav-all-cars">All Cars</a>
+
+        <a href="record.php" class="nav-my-records">My Records</a>
+
+        <a href="view_profile.php" class="nav-my-profile">My Profile</a>
+
+        <a href="renter_messages.php" class="nav-my-messages">Messages</a>
+
+        <a href="../auth/logout.php" class="logout-link">Logout</a>
+
+    </div>
+
+</div>
 
     <div class="header-text">
         <h1><span class="blue">My</span> <span class="orange">Messages</span></h1>
@@ -573,73 +588,97 @@ if ($ajax && ($_GET['section'] ?? '') === 'inspection-list') {
     </div>
 
     <script>
-        function openReplyModal(id, message) {
-            var modal = document.getElementById('replyModal');
-            var messageId = document.getElementById('messageId');
-            var originalMessage = document.getElementById('originalMessage');
-            var replyText = document.getElementById('replyText');
-            
-            if (modal && messageId && originalMessage && replyText) {
-                messageId.value = id;
-                originalMessage.textContent = message;
-                replyText.value = '';
-                modal.style.display = 'flex';
-            } else {
-                console.error('Modal elements not found');
-            }
-        }
+       document.addEventListener("DOMContentLoaded", function () {
 
-        function closeReplyModal() {
-            var modal = document.getElementById('replyModal');
-            if (modal) {
-                modal.style.display = 'none';
-            }
-        }
+    // ===============================
+    // Mobile Menu
+    // ===============================
 
-        document.addEventListener('DOMContentLoaded', function() {
-            var modal = document.getElementById('replyModal');
-            
-            if (modal) {
-                modal.addEventListener('click', function(e) {
-                    if (e.target === this) closeReplyModal();
-                });
-            }
+    const mobileMenuBtn = document.getElementById("mobileMenuBtn");
+    const mobileMenu = document.getElementById("mobileMenu");
 
-            document.querySelectorAll('.reply-btn').forEach(function(button) {
-                button.addEventListener('click', function() {
-                    var id = this.getAttribute('data-id');
-                    var message = this.getAttribute('data-message');
-                    if (id && message) {
-                        openReplyModal(id, message);
-                    }
-                });
-            });
+    if (mobileMenuBtn && mobileMenu) {
+
+        mobileMenuBtn.addEventListener("click", function () {
+
+            mobileMenu.classList.toggle("show");
+
         });
 
-        (function () {
-            const liveTargets = document.querySelectorAll('[data-live-refresh]');
-            liveTargets.forEach(function (node) {
-                const refreshUrl = node.dataset.liveRefresh;
-                const targetSelector = node.dataset.liveTarget || '#' + node.id;
-                const refreshSection = function () {
-                    fetch(refreshUrl)
-                        .then(function (response) { return response.text(); })
-                        .then(function (html) {
-                            const targetNode = document.querySelector(targetSelector);
-                            if (targetNode) {
-                                targetNode.innerHTML = html;
-                            }
-                        })
-                        .catch(function (error) {
-                            console.log('Messages auto-refresh failed:', error);
-                        });
-                };
+        document.addEventListener("click", function (e) {
 
-                refreshSection();
-                setInterval(refreshSection, 8000);
+            if (
+                !mobileMenu.contains(e.target) &&
+                !mobileMenuBtn.contains(e.target)
+            ) {
+
+                mobileMenu.classList.remove("show");
+
+            }
+
+        });
+
+    }
+
+    // ===============================
+    // Star Rating
+    // ===============================
+
+    const stars = document.querySelectorAll(".star-rating input");
+    const labels = document.querySelectorAll(".star-rating label");
+
+    labels.forEach(function(label, index){
+
+        label.addEventListener("mouseover", function(){
+
+            const value = 5 - index;
+
+            labels.forEach(function(item, i){
+
+                item.style.color =
+                    (5 - i) <= value
+                    ? "#ffd700"
+                    : "#444";
+
             });
-        })();
-    </script>
+
+        });
+
+        label.addEventListener("mouseout", function(){
+
+            const checked =
+                document.querySelector(".star-rating input:checked");
+
+            if(checked){
+
+                const value = parseInt(checked.value);
+
+                labels.forEach(function(item,i){
+
+                    item.style.color =
+                        (5 - i) <= value
+                        ? "#ffd700"
+                        : "#444";
+
+                });
+
+            }
+            else{
+
+                labels.forEach(function(item){
+
+                    item.style.color="#444";
+
+                });
+
+            }
+
+        });
+
+    });
+
+});
+</script>
 
     <footer>
         <p>&copy; 2026 Carbnb Philippines. All rights reserved.</p>

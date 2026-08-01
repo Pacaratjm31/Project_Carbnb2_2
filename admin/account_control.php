@@ -47,6 +47,7 @@ if ($ajax && ($_GET['section'] ?? '') === 'locked-accounts') {
       <a href="contact_messages.php">Contact Messages</a>
       <a href="delete_user.php">Delete Users</a>
       <a href="trashbin.php">Trash Bin</a>
+      <a href="location_tracker.php">Location Tracker</a>
       <a href="../auth/logout.php" class="topbar-action" style="display:block; margin-top:1rem; text-align:center;">Logout</a>
     </nav>
   </aside>

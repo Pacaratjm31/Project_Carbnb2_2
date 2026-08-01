@@ -234,14 +234,18 @@ function booking_status_label(string $status): string {
     <div class="nav-left">
         <h2>Carbnb</h2>
     </div>
-    <div class="nav-right">
+    <button class="mobile-menu-btn" id="mobileMenuBtn">
+        ☰
+    </button>
+    <div class="nav-right" id="mobileMenu">
         <a href="browse.php" class="nav-all-cars">All Cars</a>
-        <a href="record.php" class="nav-my-records active">My Records</a>
+        <a href="record.php" class="nav-my-records">My Records</a>
         <a href="view_profile.php" class="nav-my-profile">My Profile</a>
         <a href="renter_messages.php" class="nav-my-messages">Messages</a>
         <a href="../auth/logout.php" class="logout-link">Logout</a>
     </div>
 </div>
+
 
 <div class="header-text">
     <h1><span class="blue">My</span> <span class="orange">Records</span></h1>
@@ -397,27 +401,167 @@ function booking_status_label(string $status): string {
 
 <script>
 (function () {
-  const refreshNodes = document.querySelectorAll('[data-live-refresh]');
-  refreshNodes.forEach(function (node) {
-    const refreshUrl = node.dataset.liveRefresh;
-    const targetSelector = node.dataset.liveTarget || '#' + node.id;
-    const refreshSection = function () {
-      fetch(refreshUrl)
-        .then(function (response) { return response.text(); })
-        .then(function (html) {
-          const targetNode = document.querySelector(targetSelector);
-          if (targetNode) {
-            targetNode.innerHTML = html;
-          }
-        })
-        .catch(function (error) {
-          console.log('Records refresh failed:', error);
-        });
-    };
 
-    refreshSection();
-    setInterval(refreshSection, 8000);
-  });
+    // ============================
+    // Mobile Menu
+    // ============================
+
+    const mobileMenuBtn = document.getElementById("mobileMenuBtn");
+    const mobileMenu = document.getElementById("mobileMenu");
+
+    if (mobileMenuBtn && mobileMenu) {
+
+        mobileMenuBtn.addEventListener("click", function () {
+
+            mobileMenu.classList.toggle("show");
+
+        });
+
+        document.addEventListener("click", function (e) {
+
+            if (
+                !mobileMenu.contains(e.target) &&
+                !mobileMenuBtn.contains(e.target)
+            ) {
+                mobileMenu.classList.remove("show");
+            }
+
+        });
+
+    }
+
+
+    // ============================
+    // Reply Modal
+    // ============================
+
+    function openReplyModal(id, message) {
+
+        const modal = document.getElementById("replyModal");
+        const messageId = document.getElementById("messageId");
+        const originalMessage = document.getElementById("originalMessage");
+        const replyText = document.getElementById("replyText");
+
+        if (!modal) return;
+
+        messageId.value = id;
+        originalMessage.textContent = message;
+        replyText.value = "";
+
+        modal.style.display = "flex";
+
+    }
+
+
+    function closeReplyModal() {
+
+        const modal = document.getElementById("replyModal");
+
+        if (modal) {
+            modal.style.display = "none";
+        }
+
+    }
+
+
+    window.closeReplyModal = closeReplyModal;
+
+
+    const modal = document.getElementById("replyModal");
+
+    if (modal) {
+
+        modal.addEventListener("click", function (e) {
+
+            if (e.target === modal) {
+
+                closeReplyModal();
+
+            }
+
+        });
+
+    }
+
+
+    function bindReplyButtons() {
+
+        document.querySelectorAll(".reply-btn").forEach(function (button) {
+
+            button.onclick = function () {
+
+                openReplyModal(
+                    this.dataset.id,
+                    this.dataset.message
+                );
+
+            };
+
+        });
+
+    }
+
+
+    bindReplyButtons();
+
+
+
+    // ============================
+    // Auto Refresh
+    // ============================
+
+    document.querySelectorAll("[data-live-refresh]").forEach(function (node) {
+
+        const refreshUrl = node.dataset.liveRefresh;
+
+        const targetSelector = node.dataset.liveTarget || "#" + node.id;
+
+
+        function refreshSection() {
+
+            fetch(refreshUrl)
+
+                .then(function (response) {
+
+                    return response.text();
+
+                })
+
+                .then(function (html) {
+
+                    const target = document.querySelector(targetSelector);
+
+
+                    if (target) {
+
+                        target.innerHTML = html;
+
+
+                        // Reconnect reply buttons after refresh
+                        bindReplyButtons();
+
+                    }
+
+                })
+
+                .catch(function (error) {
+
+                    console.log("Records refresh failed:", error);
+
+                });
+
+        }
+
+
+        refreshSection();
+
+
+        setInterval(refreshSection, 8000);
+
+
+    });
+
+
 })();
 </script>
 

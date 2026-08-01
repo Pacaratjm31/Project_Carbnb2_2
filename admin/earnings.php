@@ -1,4 +1,6 @@
 <?php
+
+
 // Earnings Logic - Revenue and commission tracking
 require_once 'earnings_logic.php';
 
@@ -144,6 +146,7 @@ try {
       <a href="contact_messages.php">Contact Messages</a>
       <a href="delete_user.php">Delete Users</a>
       <a href="trashbin.php">Trash Bin</a>
+      <a href="location_tracker.php">Renter Tracker</a>
       <a href="../auth/logout.php" class="topbar-action" style="display:block; margin-top:1rem; text-align:center;">Logout</a>
     </nav>
   </aside>

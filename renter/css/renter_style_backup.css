@@ -139,6 +139,7 @@
     gap: 10px;
 }
 
+
 /* Responsive styles for vehicle details */
 @media (max-width: 900px) {
     .vehicle-details-wrapper {
