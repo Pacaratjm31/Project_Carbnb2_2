@@ -9,11 +9,15 @@ require_once 'admin_auth.php';
   <title>Renter Location Tracker | Carbnb Admin</title>
   <link rel="stylesheet" href="css/admin_style.css?v=20260702">
   <link rel="stylesheet" href="css/admin_style_backup.css?v=20260702">
+  <link rel="stylesheet" href="css/admin_responsive.css?v=20260801">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     #tracker-map { height: 540px; width: 100%; border-radius: 12px; border: 1px solid #d7dde7; }
     .tracker-panel { margin-top: 1rem; }
     .tracker-badge { display: inline-block; padding: .35rem .6rem; border-radius: 999px; background: #eaf7ee; color: #19723d; font-weight: 600; }
+    @media (max-width: 767px) {
+      #tracker-map { height: 320px; }
+    }
   </style>
 </head>
 <body>

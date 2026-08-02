@@ -408,12 +408,12 @@ try {
     function openDisapproveModal(paymentId) {
       document.getElementById('disapprovePaymentId').value = paymentId;
       document.getElementById('disapproveModal').style.display = 'flex';
-      document.body.classList.add('sidebar-open');
+      document.body.classList.add('modal-open');
     }
 
     function closeDisapproveModal() {
       document.getElementById('disapproveModal').style.display = 'none';
-      document.body.classList.remove('sidebar-open');
+      document.body.classList.remove('modal-open');
     }
 
     new Chart(document.getElementById('chart'), {

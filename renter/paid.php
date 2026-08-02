@@ -139,35 +139,14 @@ $imagePath = build_vehicle_image_path($data['car_image'] ?? '');
 $ajax = isset($_GET['ajax']) && $_GET['ajax'] === '1';
 if ($ajax && ($_GET['section'] ?? '') === 'payment-status') {
     if ($paymentStatus === 'verified' || $paymentStatus === 'pending') {
-        // Intentionally left blank: no message, no payment form, no upload form.
+        // Intentionally left blank: nothing to show once paid.
     } else {
-        if ($paymentStatus === 'disapproved') {
-            echo '<div class="payment-box">';
-            echo '<h3>Payment Disapproved</h3>';
-            echo '<p>Your previous payment was disapproved by the admin. Please try paying again below.</p>';
-            echo '</div>';
-        }
-
-        echo '<div class="payment-box">';
-        echo '<h3>Pay with Xendit</h3>';
-        echo '<p>Continue your secure automatic payment through Xendit.</p>';
-        echo '</div>';
-
-        echo '<div class="payment-form">';
         echo '<button class="btn" type="button" id="payWithXendit">Pay with Xendit</button>';
-        echo '</div>';
 
-        echo '<div class="payment-form">';
-        echo '<p>Send your payment receipt here for admin verification.</p>';
         echo '<form id="manualPaymentForm" enctype="multipart/form-data">';
         echo '<input type="file" name="proof_image" id="proof_image" accept="image/jpeg,image/png,image/webp" required>';
         echo '<button class="btn" type="submit" id="submitPaymentBtn" style="margin-top:10px;">Submit Payment</button>';
         echo '</form>';
-        echo '</div>';
-
-        echo '<div class="payment-form">';
-        echo '<a href="javascript:history.back()" class="btn-return">← Return</a>';
-        echo '</div>';
     }
     exit;
 }
@@ -182,57 +161,21 @@ if ($ajax && ($_GET['section'] ?? '') === 'payment-status') {
 </head>
 <body>
 
-    <div class="payment-container">
-        <h2>Payment</h2>
+    <div id="renter-payment-status" data-live-refresh="paid.php?ajax=1&section=payment-status&booking_id=<?= (int) $booking_id ?>" data-live-target="#renter-payment-status">
+        <?php if ($paymentStatus === 'verified' || $paymentStatus === 'pending'): ?>
 
-        <div class="payment-box">
-            <img src="<?= htmlspecialchars($imagePath) ?>"
-                 class="payment-image"
-                 onerror="this.src='../uploads/vehicles/default-car.svg'">
+            <?php /* Intentionally left blank: nothing to show once paid. */ ?>
 
-            <p><strong>Vehicle:</strong> <?= htmlspecialchars($data['vehicle_name']) ?></p>
-            <p><strong>Total:</strong> ₱<?= htmlspecialchars((string) $data['total_price']) ?></p>
-        </div>
+        <?php else: ?>
 
-        <div id="renter-payment-status" data-live-refresh="paid.php?ajax=1&section=payment-status&booking_id=<?= (int) $booking_id ?>" data-live-target="#renter-payment-status">
-            <?php if ($paymentStatus === 'verified' || $paymentStatus === 'pending'): ?>
+            <button class="btn" type="button" id="payWithXendit">Pay with Xendit</button>
 
-                <?php /* Intentionally left blank: no message, no payment form, no upload form. */ ?>
+            <form id="manualPaymentForm" enctype="multipart/form-data">
+                <input type="file" name="proof_image" id="proof_image" accept="image/jpeg,image/png,image/webp" required>
+                <button class="btn" type="submit" id="submitPaymentBtn" style="margin-top:10px;">Submit Payment</button>
+            </form>
 
-            <?php else: ?>
-
-                <?php if ($paymentStatus === 'disapproved'): ?>
-                <div class="payment-box">
-                    <h3>Payment Disapproved</h3>
-                    <p>Your previous payment was disapproved by the admin. Please try paying again below.</p>
-                </div>
-                <?php endif; ?>
-
-                <div class="payment-box">
-                    <h3>Pay with Xendit</h3>
-                    <p>Continue your secure automatic payment through Xendit.</p>
-                </div>
-
-                <div class="payment-form">
-                    <button class="btn" type="button" id="payWithXendit">Pay with Xendit</button>
-                </div>
-
-                <div class="payment-form">
-                    <p>Send your payment receipt here for admin verification.</p>
-                    <form id="manualPaymentForm" enctype="multipart/form-data">
-                        <input type="file" name="proof_image" id="proof_image" accept="image/jpeg,image/png,image/webp" required>
-
-                        <button class="btn" type="submit" id="submitPaymentBtn" style="margin-top:10px;">Submit Payment</button>
-                    </form>
-                </div>
-
-                <div class="payment-form">
-                    <a href="javascript:history.back()" class="btn-return">← Return</a>
-                </div>
-
-            <?php endif; ?>
-        </div>
-
+        <?php endif; ?>
     </div>
 
     <script>
@@ -302,8 +245,8 @@ async function(e) {
         if (!xenditWindow) {
 
 
-            alert(
-                'Please allow popups for this website.'
+            console.log(
+                'Popup blocked by the browser.'
             );
 
 
@@ -383,7 +326,7 @@ async function(e) {
 
 
 
-                alert(
+                console.log(
                     result.message ||
                     'Unable to create Xendit payment.'
                 );
@@ -408,7 +351,7 @@ async function(e) {
 
 
 
-            alert(
+            console.log(
                 'Xendit payment connection failed.'
             );
 
@@ -507,7 +450,7 @@ async function(e) {
             if(result.success) {
 
 
-                alert(
+                console.log(
                     result.message ||
                     'Payment submitted.'
                 );
@@ -520,7 +463,7 @@ async function(e) {
             } else {
 
 
-                alert(
+                console.log(
                     result.message ||
                     'Unable to submit payment.'
                 );
@@ -536,7 +479,7 @@ async function(e) {
             console.error(error);
 
 
-            alert(
+            console.log(
                 'Payment submission failed.'
             );
 

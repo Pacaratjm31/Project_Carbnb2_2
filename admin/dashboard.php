@@ -110,7 +110,7 @@ if ($ajax && ($_GET['section'] ?? '') === 'overview-table') {
           <a href="verify_vehicles.php" class="action-btn">Verify Vehicles</a>
           <a href="booking_records.php" class="action-btn">View Bookings</a>
           <a href="contact_messages.php" class="action-btn">Contact Messages</a>
-          <a href="location_tracker.php">Location Tracker</a>
+          <a href="location_tracker.php" class="action-btn">Location Tracker</a>
         </div>
       </section>
 

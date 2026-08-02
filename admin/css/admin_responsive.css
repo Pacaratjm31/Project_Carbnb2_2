@@ -1,0 +1,712 @@
+/* =====================================================
+   Carbnb Admin — Responsive Layer (Consolidated)
+   Single source of truth for tablet + mobile behavior.
+   Desktop (>992px) is untouched — matches admin_style.css
+   exactly. Loaded last, after admin_style.css and
+   admin_style_backup.css, on every admin page.
+   Breakpoints: 992 / 768 / 576 / 480
+===================================================== */
+
+/* -----------------------------------------------------
+   GLOBAL SAFETY NET
+   Nothing should ever be wider than the viewport.
+----------------------------------------------------- */
+html,
+body {
+  overflow-x: hidden;
+  width: 100%;
+}
+
+img,
+video,
+canvas,
+iframe,
+table {
+  max-width: 100%;
+}
+
+/* Booking records page ships two markups (desktop table +
+   mobile card list). Default: mobile cards hidden, desktop
+   table shows, at every width until the mobile breakpoint
+   below flips them. Fixes both being visible at once. */
+.only-mobile {
+  display: none;
+}
+
+/* =======================================================
+   TABLET — 992px and below
+   ======================================================= */
+@media (max-width: 992px) {
+  /* Off-canvas sidebar drawer. Base .sidebar rule in
+     admin_style.css already sets position/width/etc — this
+     only adds the collapsed/open transform states. */
+  .sidebar {
+    transform: translateX(-100%);
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .main-content {
+    margin-left: 0;
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+
+  .topbar {
+    padding: 16px 18px;
+  }
+
+  .sidebar-toggle {
+    display: inline-flex;
+  }
+
+  body.sidebar-open,
+  body.modal-open {
+    overflow: hidden;
+  }
+
+  .page {
+    padding: 22px;
+  }
+
+  .card,
+  .form-card {
+    padding: 16px;
+  }
+
+  .hero-card {
+    padding: 18px;
+  }
+
+  .stats-grid,
+  .quick-actions,
+  .content-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+
+  .stat-box {
+    padding: 14px;
+  }
+
+  .vehicle-card {
+    padding: 16px;
+    gap: 16px;
+  }
+
+  /* earnings.php summary grid uses an inline
+     grid-template-columns style, which outranks a plain
+     class rule — !important is required to collapse it. */
+  #admin-earnings-summary {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+/* =======================================================
+   MOBILE — 768px and below (the real redesign)
+   ======================================================= */
+@media (max-width: 768px) {
+  .main-content,
+  .page {
+    max-width: 100%;
+    overflow-x: hidden;
+    padding: 14px;
+    gap: 14px;
+  }
+
+  .topbar {
+    padding: 12px 14px;
+  }
+
+  .topbar h1 {
+    font-size: 1.05rem;
+  }
+
+  .section-title {
+    font-size: 1rem;
+  }
+
+  .card,
+  .form-card {
+    padding: 14px;
+    border-radius: 12px;
+  }
+
+  /* Hero sections stack vertically */
+  .hero-card {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: left;
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .hero-card h2 {
+    font-size: 1.15rem;
+  }
+
+  .hero-card p {
+    font-size: 0.92rem;
+  }
+
+  .hero-card .topbar-action {
+    align-self: flex-start;
+    width: 100%;
+    text-align: center;
+  }
+
+  /* Stat boxes: 2 per row, compact */
+  .stats-grid,
+  .content-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .stat-box {
+    padding: 14px;
+  }
+
+  .stat-box h3 {
+    font-size: 0.8rem;
+  }
+
+  .stat-box p {
+    font-size: 1.15rem;
+  }
+
+  /* Quick action buttons: full width, stacked */
+  .quick-actions {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .quick-actions .action-btn {
+    width: 100%;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* ---- Tables -> stacked cards, bold title row -----------
+     Every <td> already carries data-label, so this is a
+     pure-CSS conversion. Scoped with :not(.info-table) so
+     the nested vehicle detail table (below) isn't affected —
+     it needs a different treatment. */
+  .table-wrapper {
+    overflow-x: visible;
+    border-radius: 14px;
+  }
+
+  table.table:not(.info-table) thead {
+    display: none;
+  }
+
+  table.table:not(.info-table),
+  table.table:not(.info-table) tbody,
+  table.table:not(.info-table) tr {
+    display: block;
+    width: 100%;
+  }
+
+  table.table:not(.info-table) tr {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px;
+    margin-bottom: 12px;
+  }
+
+  table.table:not(.info-table) td {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    text-align: right;
+    padding: 8px 0;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.86rem;
+  }
+
+  table.table:not(.info-table) td:last-child {
+    border-bottom: none;
+  }
+
+  table.table:not(.info-table) td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: var(--muted);
+    text-align: left;
+    flex-shrink: 0;
+  }
+
+  /* First cell in every row becomes the bold card title —
+     no data-label prefix, larger text, own divider line. */
+  table.table:not(.info-table) td:first-child {
+    display: block;
+    text-align: left;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text);
+    padding-bottom: 10px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  table.table:not(.info-table) td:first-child::before {
+    content: none;
+  }
+
+  /* Empty-state row shouldn't get the label/flex treatment */
+  table.table td.empty-state {
+    display: block;
+    text-align: center;
+    padding: 16px 0;
+  }
+
+  table.table td.empty-state::before {
+    content: none;
+  }
+
+  /* Action cells: buttons/links/forms stack full width */
+  table.table td.cell-actions {
+    justify-content: flex-start;
+    align-items: stretch;
+  }
+
+  table.table td.cell-actions::before {
+    display: none;
+  }
+
+  table.table .action-group {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  table.table .action-group > a,
+  table.table .action-group > button,
+  table.table .action-group > form,
+  table.table .action-group form button {
+    width: 100%;
+  }
+
+  .action-btn-small,
+  .view-docs-btn {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+
+  /* ---- Nested vehicle info-table --------------------------
+     Label above value (not a flex row) since it's already
+     inside a vehicle-card, not a full-width data table.
+     width:auto overrides the desktop fixed th width, which
+     would otherwise misalign the stacked block layout. */
+  table.info-table,
+  table.info-table tbody,
+  table.info-table tr,
+  table.info-table th,
+  table.info-table td {
+    display: block;
+    width: 100%;
+  }
+
+  table.info-table tr {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+  }
+
+  table.info-table th {
+    width: auto;
+    color: var(--muted);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 0 0 4px 0;
+  }
+
+  table.info-table td {
+    padding: 0;
+    color: var(--muted);
+  }
+
+  /* ---- Vehicle cards (verify_vehicles.php) ----------------
+     Image on top, details below, actions stacked full width. */
+  .vehicle-card {
+    display: flex;
+    flex-direction: column;
+    padding: 14px;
+    gap: 14px;
+  }
+
+  .vehicle-image,
+  .vehicle-details,
+  .vehicle-actions {
+    width: 100%;
+  }
+
+  .vehicle-image {
+    aspect-ratio: 16 / 9;
+  }
+
+  .vehicle-image img,
+  .vehicle-image .no-image {
+    width: 100%;
+    height: 100%;
+    max-height: 220px;
+    object-fit: cover;
+    border-radius: 10px;
+  }
+
+  .vehicle-details h3 {
+    font-size: 18px;
+  }
+
+  .vehicle-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .vehicle-actions form,
+  .vehicle-actions button,
+  .vehicle-actions .action-btn-small {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  /* ---- Booking records: desktop table vs mobile cards -----
+     .only-desktop/.only-mobile/.booking-card* had no CSS
+     anywhere before this file — both markups rendered at
+     once on every screen size. This is the fix. */
+  .only-desktop {
+    display: none;
+  }
+
+  .only-mobile {
+    display: block;
+  }
+
+  .booking-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .booking-card {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px;
+  }
+
+  .booking-card-header {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text);
+    padding-bottom: 10px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .booking-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .booking-card-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 0.86rem;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .booking-card-row:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  .booking-card-row .label {
+    color: var(--muted);
+    font-weight: 600;
+  }
+
+  .booking-card-row .value {
+    text-align: right;
+  }
+
+  .booking-card-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .booking-card-actions form,
+  .booking-card-actions button,
+  .booking-card-actions .action-btn-small {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  /* ---- Document verification modal (manage_users.php) ----- */
+  .doc-modal-content {
+    margin: 16px;
+    max-width: calc(100% - 32px);
+    padding: 16px;
+  }
+
+  .doc-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .doc-modal-header h3 {
+    font-size: 16px;
+  }
+
+  /* ---- Generic modal (reject/disapprove, shared) ---------- */
+  .modal-content {
+    width: calc(100% - 32px);
+    margin: 16px auto;
+    padding: 16px;
+  }
+
+  .modal-content textarea,
+  .modal-content input,
+  .modal-content select {
+    width: 100%;
+  }
+
+  .modal-content button,
+  .modal-content .btn-primary,
+  .modal-content .action-btn-small {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  /* ---- earnings.php --------------------------------------- */
+  #admin-earnings-summary {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  #chart {
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  /* ---- contact_messages.php "Send Message to User" form --- */
+  .form-grid-2 {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  .form-control {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  #sendMessageForm .action-btn-small {
+    width: 100%;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* ---- Login / register ------------------------------------ */
+  .login-card,
+  .register-card {
+    padding: 35px 25px;
+  }
+
+  .logo h1 {
+    font-size: 34px;
+  }
+}
+
+/* =======================================================
+   SMALL PHONE — 576px and below
+   ======================================================= */
+@media (max-width: 576px) {
+  .page,
+  .main-content {
+    padding: 14px;
+  }
+
+  .card,
+  .form-card {
+    padding: 12px;
+    border-radius: 14px;
+  }
+
+  .topbar {
+    padding: 12px 14px;
+  }
+
+  .topbar h1 {
+    font-size: 1rem;
+  }
+
+  .sidebar {
+    width: min(240px, 82vw);
+  }
+
+  table.table:not(.info-table) tr {
+    padding: 10px 12px;
+  }
+
+  .stat-box h3 {
+    font-size: 0.85rem;
+  }
+
+  .stat-box p {
+    font-size: 1.15rem;
+  }
+
+  .modal-content,
+  .doc-modal-content {
+    width: 92%;
+    max-width: 400px;
+    margin: 20px auto;
+    padding: 16px;
+  }
+
+  .doc-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 10px;
+  }
+
+  .receipt-thumb {
+    max-width: 48px !important;
+    max-height: 48px !important;
+  }
+
+  .card canvas {
+    max-height: 220px !important;
+  }
+
+  .login-container,
+  .register-container {
+    padding: 15px;
+  }
+
+  .login-card,
+  .register-card {
+    padding: 30px 20px;
+  }
+
+  .logo h1 {
+    font-size: 30px;
+  }
+
+  .logo p {
+    font-size: 14px;
+  }
+
+  .form-grid-2 {
+    grid-template-columns: 1fr !important;
+  }
+
+  input,
+  select,
+  textarea,
+  .form-control {
+    width: 100%;
+  }
+}
+
+/* =======================================================
+   EXTRA-SMALL PHONE — 480px and below
+   ======================================================= */
+@media (max-width: 480px) {
+  .page,
+  .main-content {
+    padding: 10px;
+    gap: 12px;
+  }
+
+  .topbar {
+    padding: 10px 12px;
+  }
+
+  .topbar h1 {
+    font-size: 0.95rem;
+  }
+
+  .card,
+  .form-card {
+    padding: 12px;
+  }
+
+  .hero-card h2 {
+    font-size: 1.05rem;
+  }
+
+  .hero-card p {
+    font-size: 0.85rem;
+  }
+
+  .stat-box {
+    padding: 12px;
+  }
+
+  .sidebar {
+    width: min(220px, 85vw);
+    padding: 16px 12px;
+  }
+
+  .sidebar-header h2 {
+    font-size: 1.05rem;
+  }
+
+  table.table:not(.info-table) td {
+    flex-wrap: wrap;
+    text-align: left;
+  }
+
+  table.table:not(.info-table) td::before {
+    flex-basis: 100%;
+    margin-bottom: 2px;
+  }
+
+  .table th,
+  .table td {
+    padding: 6px 5px;
+    font-size: 0.78rem;
+  }
+
+  .status-badge {
+    padding: 4px 8px;
+    font-size: 0.78rem;
+  }
+
+  .alert {
+    font-size: 0.88rem;
+    padding: 8px 10px;
+  }
+
+  .empty-state,
+  .text-muted {
+    font-size: 0.85rem;
+  }
+
+  button,
+  .action-btn-small,
+  .btn-primary {
+    font-size: 0.85rem;
+    padding: 9px 12px;
+  }
+}

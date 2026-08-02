@@ -27,6 +27,7 @@ if ($ajax && ($_GET['section'] ?? '') === 'deleted-users') {
   <title>Trash Bin | Carbnb Admin</title>
   <link rel="stylesheet" href="css/admin_style.css?v=20260702">
   <link rel="stylesheet" href="css/admin_style_backup.css?v=20260702">
+  <link rel="stylesheet" href="css/admin_responsive.css?v=20260801">
 </head>
 <body>
   <div class="overlay"></div>
