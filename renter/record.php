@@ -178,6 +178,7 @@ if ($ajax && ($_GET['section'] ?? '') === 'booking-history') {
             echo '<span class="status status-' . strtolower($b['status']) . '">' . htmlspecialchars(ucfirst(str_replace('_', ' ', $b['status']))) . '</span>';
             if ($b['status'] === 'approved') {
                 echo '<form method="POST" style="display:inline; margin-left:10px;" onsubmit="return confirm(\'Confirm that you have returned this car?\');">';
+                echo form_token_input('return_car');
                 echo '<input type="hidden" name="booking_id" value="' . (int) $b['id'] . '">';
                 echo '<button type="submit" name="return_car" class="btn-small">Return Car</button>';
                 echo '</form>';

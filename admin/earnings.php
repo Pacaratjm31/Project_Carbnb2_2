@@ -1,6 +1,5 @@
 <?php
 
-
 // Earnings Logic - Revenue and commission tracking
 require_once 'earnings_logic.php';
 
@@ -16,6 +15,53 @@ $revenues = [];
 $chartLabels = [];
 $chartData = [];
 
+// ============================================
+// MOVED: SQL Calculations - Run BEFORE AJAX
+// ============================================
+// Total Revenue (All Status)
+try {
+    $stmt = $pdo->query("
+        SELECT 
+            SUM(amount) AS total_revenue,
+            COUNT(*) AS total_transactions,
+            SUM(CASE WHEN status = 'verified' THEN amount ELSE 0 END) AS verified_revenue,
+            SUM(CASE WHEN status = 'pending' THEN amount ELSE 0 END) AS pending_revenue
+        FROM payments
+    ");
+    $total = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    $totalRevenue = (float) ($total['total_revenue'] ?? 0);
+    $totalTransactions = (int) ($total['total_transactions'] ?? 0);
+    $verifiedRevenue = (float) ($total['verified_revenue'] ?? 0);
+    $pendingRevenue = (float) ($total['pending_revenue'] ?? 0);
+
+    // Calculate commission (20%) and owner income (80%) based on verified revenue
+    $totalCommission = $verifiedRevenue * 0.20;
+    $totalOwnerIncome = $verifiedRevenue * 0.80;
+
+    // Monthly Data (Only Verified)
+    $stmt2 = $pdo->query("
+        SELECT 
+            DATE_FORMAT(created_at, '%Y-%m') AS month,
+            SUM(amount) AS revenue
+        FROM payments
+        WHERE status = 'verified'
+        GROUP BY DATE_FORMAT(created_at, '%Y-%m')
+        ORDER BY month ASC
+    ");
+    $data = $stmt2->fetchAll(PDO::FETCH_ASSOC);
+
+    foreach ($data as $row) {
+        $chartLabels[] = $row['month'];
+        $chartData[] = (float) $row['revenue'];
+    }
+} catch (PDOException $e) {
+    $error = $e->getMessage();
+}
+
+// ============================================
+// AJAX endpoints - Now use the calculated values
+// ============================================
 $ajax = isset($_GET['ajax']) && $_GET['ajax'] === '1';
 if ($ajax && ($_GET['section'] ?? '') === 'earnings-summary') {
     echo '<div class="stat-box"><h3>Total Revenue (All)</h3><p>₱' . number_format($totalRevenue, 2) . '</p></div>';
@@ -75,48 +121,12 @@ if ($ajax && ($_GET['section'] ?? '') === 'payment-history-table') {
     exit;
 }
 
-// Total Revenue (All Status)
-try {
-    $stmt = $pdo->query("
-        SELECT 
-            SUM(amount) AS total_revenue,
-            COUNT(*) AS total_transactions,
-            SUM(CASE WHEN status = 'verified' THEN amount ELSE 0 END) AS verified_revenue,
-            SUM(CASE WHEN status = 'pending' THEN amount ELSE 0 END) AS pending_revenue
-        FROM payments
-    ");
-    $total = $stmt->fetch(PDO::FETCH_ASSOC);
+// ============================================
+// REMOVED: SQL calculations moved to the top
+// ============================================
+// (The SQL block that was here is now at the top)
 
-    $totalRevenue = (float) ($total['total_revenue'] ?? 0);
-    $totalTransactions = (int) ($total['total_transactions'] ?? 0);
-    $verifiedRevenue = (float) ($total['verified_revenue'] ?? 0);
-    $pendingRevenue = (float) ($total['pending_revenue'] ?? 0);
-
-    // Calculate commission (20%) and owner income (80%) based on verified revenue
-    $totalCommission = $verifiedRevenue * 0.20;
-    $totalOwnerIncome = $verifiedRevenue * 0.80;
-
-    // Monthly Data (Only Verified)
-    $stmt2 = $pdo->query("
-        SELECT 
-            DATE_FORMAT(created_at, '%Y-%m') AS month,
-            SUM(amount) AS revenue
-        FROM payments
-        WHERE status = 'verified'
-        GROUP BY DATE_FORMAT(created_at, '%Y-%m')
-        ORDER BY month ASC
-    ");
-    $data = $stmt2->fetchAll(PDO::FETCH_ASSOC);
-
-    foreach ($data as $row) {
-        $chartLabels[] = $row['month'];
-        $chartData[] = (float) $row['revenue'];
-    }
-} catch (PDOException $e) {
-    $error = $e->getMessage();
-}
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
