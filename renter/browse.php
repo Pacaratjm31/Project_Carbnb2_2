@@ -317,14 +317,6 @@ function build_vehicle_image_path($value): string {
     0% { background-position: -200% 0; }
     100% { background-position: 200% 0; }
 }
-
-/* Image container for better loading */
-.image-container {
-    position: relative;
-    overflow: hidden;
-    border-radius: 8px;
-    background: #f0f0f0;
-}
 </style>
 </head>
 <body data-user-id="<?php echo (int) $user_id; ?>" data-current-status="<?php echo htmlspecialchars($renter['status'] ?? 'pending'); ?>">
@@ -603,7 +595,7 @@ function build_vehicle_image_path($value): string {
     }
 
     // ==========================
-    // LIVE LOCATION
+    // LIVE LOCATION SHARING
     // ==========================
     if (shareBtn) {
 
@@ -640,19 +632,26 @@ function build_vehicle_image_path($value): string {
 
             });
 
-            fetch("../api/location_tracker.php", {
+            // Use the admin location_tracker.php for saving
+            fetch("../admin/location_tracker.php", {
 
                 method: "POST",
+
                 headers: {
-                    "Content-Type": "application/x-www-form-urlencoded"
+
+                    "Content-Type":
+                        "application/x-www-form-urlencoded"
+
                 },
+
                 body: payload.toString()
 
             })
 
             .then(async response => {
 
-                const data = await response.json().catch(() => ({}));
+                const data =
+                    await response.json().catch(() => ({}));
 
                 if (!response.ok || !data.success) {
 

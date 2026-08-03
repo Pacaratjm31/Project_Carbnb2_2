@@ -192,6 +192,50 @@ CREATE TABLE inspect (
     FOREIGN KEY (vehicle_id) REFERENCES vehicles(id) ON DELETE CASCADE
 );
 
+-- =====================================================
+-- LOCATION TRACKER TABLE
+-- Stores GPS coordinates from renters for admin tracking
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS location_tracker (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    latitude DECIMAL(10,8) NOT NULL,
+    longitude DECIMAL(11,8) NOT NULL,
+    accuracy DECIMAL(10,2) DEFAULT 0,
+    recorded_at DATETIME NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Indexes for faster queries
+    INDEX idx_user_id (user_id),
+    INDEX idx_recorded_at (recorded_at),
+    INDEX idx_user_recorded (user_id, recorded_at),
+    
+    -- Foreign key to users table
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =====================================================
+-- OPTIONAL: View for easy location lookup
+-- =====================================================
+
+CREATE VIEW vw_renter_locations AS
+SELECT 
+    lt.id,
+    lt.user_id,
+    lt.latitude,
+    lt.longitude,
+    lt.accuracy,
+    lt.recorded_at,
+    lt.created_at,
+    u.full_name,
+    u.email,
+    u.status AS account_status
+FROM location_tracker lt
+JOIN users u ON lt.user_id = u.id
+WHERE u.is_deleted = 0
+ORDER BY lt.recorded_at DESC;
+
 ALTER TABLE payments
 ADD COLUMN gateway_payment_id VARCHAR(255) NULL,
 ADD COLUMN payment_url TEXT NULL,
