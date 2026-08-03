@@ -1,14 +1,34 @@
 <?php
-require_once 'admin_auth.php';
+// ============================================
+// FIX: Ensure admin_auth.php loads correctly
+// ============================================
+require_once __DIR__ . '/admin_auth.php';
 
 // ============================================
-// DATABASE CONNECTION
+// FIX: Make sure $pdo is available
 // ============================================
 $pdo = $GLOBALS['pdo'] ?? null;
+
+// If still not available, try to load db.php directly
 if (!$pdo) {
-    // Try to establish connection if not available
-    require_once '../database/db.php';
+    require_once __DIR__ . '/../database/db.php';
     $pdo = $GLOBALS['pdo'] ?? null;
+}
+
+// If STILL not available, try to connect directly
+if (!$pdo) {
+    try {
+        // InfinityFree database credentials
+        $host = 'sql207.infinityfree.com';
+        $dbname = 'if0_42554417_carbnb';
+        $username = 'if0_42554417';
+        $password = 'YOUR_DATABASE_PASSWORD_HERE'; // ← CHANGE THIS
+        $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $username, $password);
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $GLOBALS['pdo'] = $pdo;
+    } catch (PDOException $e) {
+        // Connection failed
+    }
 }
 
 // ============================================
@@ -18,11 +38,6 @@ $ajax = isset($_GET['ajax']) && $_GET['ajax'] === '1';
 
 // --- POST: Renter sends location ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$ajax) {
-    // Start session to get user_id
-    if (session_status() === PHP_SESSION_NONE) {
-        session_start();
-    }
-    
     header('Content-Type: application/json');
     
     // Check if user is logged in

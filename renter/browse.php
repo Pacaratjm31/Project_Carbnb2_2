@@ -595,7 +595,7 @@ function build_vehicle_image_path($value): string {
     }
 
     // ==========================
-    // LIVE LOCATION SHARING
+    // LIVE LOCATION SHARING (Updated URL)
     // ==========================
     if (shareBtn) {
 
@@ -632,8 +632,10 @@ function build_vehicle_image_path($value): string {
 
             });
 
-            // Use the admin location_tracker.php for saving
-            fetch("../admin/location_tracker.php", {
+            // ============================================
+            // UPDATED: Use absolute path to admin folder
+            // ============================================
+            fetch("/admin/location_tracker.php", {
 
                 method: "POST",
 
