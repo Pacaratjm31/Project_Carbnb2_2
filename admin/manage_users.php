@@ -37,6 +37,7 @@ if ($ajax && ($_GET['section'] ?? '') === 'registered-users') {
   <title>Verify Users | Carbnb Admin</title>
   <link rel="stylesheet" href="css/admin_style.css?v=20260702">
   <link rel="stylesheet" href="css/admin_style_backup.css?v=20260702">
+  <link rel="stylesheet" href="css/admin_responsive.css?v=20260801">
   <style>
     .view-docs-btn {
       background: var(--accent-2);
@@ -118,6 +119,7 @@ if ($ajax && ($_GET['section'] ?? '') === 'registered-users') {
       object-fit: contain;
       border-radius: 6px;
       margin-bottom: 8px;
+      background: #1a1a1a;
     }
     .doc-item a {
       color: var(--accent-2);
@@ -134,6 +136,7 @@ if ($ajax && ($_GET['section'] ?? '') === 'registered-users') {
       border-radius: 50%;
       border: 3px solid var(--accent);
       margin: 0 auto;
+      background: #1a1a1a;
     }
     .face-status {
       margin-top: 10px;
@@ -145,8 +148,30 @@ if ($ajax && ($_GET['section'] ?? '') === 'registered-users') {
     .face-status.not-verified {
       color: var(--danger);
     }
+    /* Image loading styles for modal */
+    .doc-item img,
+    .face-preview img {
+      transition: opacity 0.3s ease;
+    }
+    .doc-item img.loaded,
+    .face-preview img.loaded {
+      opacity: 1;
+    }
+    .doc-item img:not(.loaded),
+    .face-preview img:not(.loaded) {
+      opacity: 0;
+    }
+    .doc-item img.loading,
+    .face-preview img.loading {
+      background: linear-gradient(90deg, #1a1a1a 25%, #2a2a2a 50%, #1a1a1a 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+    }
+    @keyframes shimmer {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
   </style>
-  <link rel="stylesheet" href="css/admin_responsive.css?v=20260801">
 </head>
 <body>
   <div class="overlay"></div>
@@ -314,9 +339,9 @@ if ($ajax && ($_GET['section'] ?? '') === 'registered-users') {
           content += '<div>' + docLabel + '</div>';
           
           if (isVideo) {
-            content += '<video controls><source src="../' + doc.file_path + '" type="video/webm">Your browser does not support the video tag.</video>';
+            content += '<video controls preload="metadata"><source src="../' + doc.file_path + '" type="video/webm">Your browser does not support the video tag.</video>';
           } else {
-            content += '<img src="../' + doc.file_path + '" alt="' + docLabel + '" onerror="this.src=\'../assets/placeholder.png\'">';
+            content += '<img src="../' + doc.file_path + '" alt="' + docLabel + '" loading="lazy" decoding="async" onerror="this.src=\'../assets/placeholder.png\'" class="loading">';
           }
           
           content += '<a href="../' + doc.file_path + '" target="_blank">View Full</a>';
@@ -334,7 +359,7 @@ if ($ajax && ($_GET['section'] ?? '') === 'registered-users') {
         
         if (user.face_image_path) {
           content += '<div class="face-preview">';
-          content += '<img src="../' + user.face_image_path + '" alt="Face Image" onerror="this.style.display=\'none\'">';
+          content += '<img src="../' + user.face_image_path + '" alt="Face Image" loading="lazy" decoding="async" onerror="this.style.display=\'none\'" class="loading">';
           content += '<div class="face-status ' + (user.face_verified == 1 ? 'verified' : 'not-verified') + '">';
           content += user.face_verified == 1 ? '✓ Face Verified' : '✗ Face Not Verified';
           content += '</div></div>';
@@ -347,6 +372,24 @@ if ($ajax && ($_GET['section'] ?? '') === 'registered-users') {
 
       document.getElementById('modalContent').innerHTML = content;
       document.getElementById('docModal').classList.add('active');
+
+      // Apply image loading handlers to modal images
+      document.querySelectorAll('#modalContent img').forEach(function(img) {
+        img.classList.add('loading');
+        if (img.complete) {
+          img.classList.remove('loading');
+          img.classList.add('loaded');
+        } else {
+          img.addEventListener('load', function() {
+            this.classList.remove('loading');
+            this.classList.add('loaded');
+          });
+          img.addEventListener('error', function() {
+            this.classList.remove('loading');
+            this.classList.add('loaded');
+          });
+        }
+      });
     }
 
     function closeDocModal() {
@@ -426,6 +469,51 @@ if ($ajax && ($_GET['section'] ?? '') === 'registered-users') {
         }
       });
     });
+
+    // Live refresh with improved error handling
+    (function () {
+      const liveTargets = document.querySelectorAll('[data-live-refresh]');
+      let refreshIntervals = [];
+
+      liveTargets.forEach(function (node) {
+        const refreshUrl = node.dataset.liveRefresh;
+        const targetSelector = node.dataset.liveTarget || '#' + node.id;
+
+        function refreshSection() {
+          fetch(refreshUrl, {
+            headers: {
+              'Cache-Control': 'no-cache',
+              'Pragma': 'no-cache'
+            }
+          })
+            .then(function (response) {
+              if (!response.ok) {
+                throw new Error('Network response was not ok');
+              }
+              return response.text();
+            })
+            .then(function (html) {
+              const targetNode = document.querySelector(targetSelector);
+              if (targetNode) {
+                targetNode.innerHTML = html;
+              }
+            })
+            .catch(function (error) {
+              console.log('Manage users live refresh failed:', error);
+            });
+        }
+
+        refreshSection();
+        const intervalId = setInterval(refreshSection, 8000);
+        refreshIntervals.push(intervalId);
+      });
+
+      window.addEventListener('beforeunload', function() {
+        refreshIntervals.forEach(function(id) {
+          clearInterval(id);
+        });
+      });
+    })();
   </script>
 </body>
 </html>

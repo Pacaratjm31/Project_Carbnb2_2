@@ -128,6 +128,33 @@ $total_reviews = (int) $rating_stats['total_reviews'];
         background: #ffc107;
         color: black;
     }
+
+    /* Image loading styles */
+    .vehicle-image {
+        background: #f0f0f0;
+        min-height: 200px;
+        transition: opacity 0.3s ease;
+        object-fit: cover;
+        width: 100%;
+        height: auto;
+        max-height: 400px;
+        border-radius: 8px;
+    }
+    .vehicle-image.loaded {
+        opacity: 1;
+    }
+    .vehicle-image:not(.loaded) {
+        opacity: 0;
+    }
+    .vehicle-image.loading {
+        background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+        background-size: 200% 100%;
+        animation: shimmer 1.5s infinite;
+    }
+    @keyframes shimmer {
+        0% { background-position: -200% 0; }
+        100% { background-position: 200% 0; }
+    }
     </style>
 </head>
 
@@ -159,9 +186,13 @@ $total_reviews = (int) $rating_stats['total_reviews'];
         <!-- Left Column: Vehicle Image -->
         <div class="vehicle-image-card">
             <img src="<?= htmlspecialchars($imgPath) ?>"
-                 class="vehicle-image"
-                 alt="Car Image"
-                 onerror="this.src='../uploads/vehicles/default-car.svg'">
+                 class="vehicle-image loading"
+                 alt="<?= htmlspecialchars($car['vehicle_name']) ?>"
+                 loading="lazy"
+                 decoding="async"
+                 width="400"
+                 height="300"
+                 onerror="this.src='../uploads/vehicles/default-car.svg'; this.className='vehicle-image loaded';">
             <div class="vehicle-branding-footer">
                 <h4 class="branding-title">Carbnb Philippines</h4>
                 <p class="branding-text">Safe Vehicle Rentals</p>
@@ -277,6 +308,25 @@ $total_reviews = (int) $rating_stats['total_reviews'];
 </div>
 
 <script>
+// Image loading handler
+document.addEventListener('DOMContentLoaded', function() {
+    const img = document.querySelector('.vehicle-image');
+    if (img) {
+        if (img.complete) {
+            img.classList.remove('loading');
+            img.classList.add('loaded');
+        } else {
+            img.addEventListener('load', function() {
+                this.classList.remove('loading');
+                this.classList.add('loaded');
+            });
+            img.addEventListener('error', function() {
+                this.classList.remove('loading');
+                this.classList.add('loaded');
+            });
+        }
+    }
+});
 
 (function () {
 

@@ -174,6 +174,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <title>Book Car | Carbnb</title>
 <link rel="stylesheet" href="css/renter_style.css?v=2">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<style>
+/* Image loading styles */
+.car-img-large {
+    background: #f0f0f0;
+    min-height: 200px;
+    transition: opacity 0.3s ease;
+    object-fit: cover;
+    width: 100%;
+    height: auto;
+    max-height: 350px;
+    border-radius: 8px;
+}
+.car-img-large.loaded {
+    opacity: 1;
+}
+.car-img-large:not(.loaded) {
+    opacity: 0;
+}
+.car-img-large.loading {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+}
+@keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+</style>
 </head>
 
 <body>
@@ -184,9 +212,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <div class="car-preview">
         <img src="<?= htmlspecialchars($imgPath) ?>"
-             class="car-img-large"
-             alt="Car Image"
-             onerror="this.src='../uploads/vehicles/default-car.svg'">
+             class="car-img-large loading"
+             alt="<?= htmlspecialchars($car['vehicle_name']) ?>"
+             loading="lazy"
+             decoding="async"
+             width="400"
+             height="250"
+             onerror="this.src='../uploads/vehicles/default-car.svg'; this.className='car-img-large loaded';">
 
         <h3><?= htmlspecialchars($car['vehicle_name']) ?></h3>
 
@@ -220,6 +252,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script>
+// Image loading handler
+document.addEventListener('DOMContentLoaded', function() {
+    const img = document.querySelector('.car-img-large');
+    if (img) {
+        if (img.complete) {
+            img.classList.remove('loading');
+            img.classList.add('loaded');
+        } else {
+            img.addEventListener('load', function() {
+                this.classList.remove('loading');
+                this.classList.add('loaded');
+            });
+            img.addEventListener('error', function() {
+                this.classList.remove('loading');
+                this.classList.add('loaded');
+            });
+        }
+    }
+});
+
 const startInput = document.getElementById('start_date');
 const endInput = document.getElementById('end_date');
 const daysDisplay = document.getElementById('total-days');

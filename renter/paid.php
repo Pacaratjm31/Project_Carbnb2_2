@@ -160,7 +160,14 @@ function renderPaymentUI($paymentStatus, $imagePath, $vehicleName, $totalPrice, 
                 <div style="background:#d4edda;color:#155724;padding:15px;border-radius:5px;margin-bottom:20px;border:1px solid #c3e6cb;">
                     ✅ Payment Verified Successfully.
                 </div>
-                <img src="<?= htmlspecialchars($imagePath) ?>" class="payment-image" onerror="this.src='../uploads/vehicles/default-car.svg'">
+                <img src="<?= htmlspecialchars($imagePath) ?>"
+                     class="payment-image"
+                     alt="<?= htmlspecialchars($vehicleName) ?>"
+                     loading="lazy"
+                     decoding="async"
+                     width="300"
+                     height="200"
+                     onerror="this.src='../uploads/vehicles/default-car.svg'; this.onerror=null;">
                 <p><strong>Vehicle:</strong> <?= htmlspecialchars($vehicleName) ?></p>
                 <p><strong>Total:</strong> ₱<?= htmlspecialchars((string) $totalPrice) ?></p>
             </div>
@@ -186,7 +193,14 @@ function renderPaymentUI($paymentStatus, $imagePath, $vehicleName, $totalPrice, 
             
             <!-- Vehicle Details -->
             <div class="payment-box">
-                <img src="<?= htmlspecialchars($imagePath) ?>" class="payment-image" onerror="this.src='../uploads/vehicles/default-car.svg'">
+                <img src="<?= htmlspecialchars($imagePath) ?>"
+                     class="payment-image"
+                     alt="<?= htmlspecialchars($vehicleName) ?>"
+                     loading="lazy"
+                     decoding="async"
+                     width="300"
+                     height="200"
+                     onerror="this.src='../uploads/vehicles/default-car.svg'; this.onerror=null;">
                 <p><strong>Vehicle:</strong> <?= htmlspecialchars($vehicleName) ?></p>
                 <p><strong>Total:</strong> ₱<?= htmlspecialchars((string) $totalPrice) ?></p>
             </div>
@@ -254,6 +268,34 @@ if ($ajax && ($_GET['section'] ?? '') === 'payment-status') {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Payment | Carbnb</title>
     <link rel="stylesheet" href="css/renter_style.css?v=2">
+    <style>
+    /* Image loading styles */
+    .payment-image {
+        background: #f0f0f0;
+        min-height: 150px;
+        transition: opacity 0.3s ease;
+        object-fit: cover;
+        width: 100%;
+        height: auto;
+        max-height: 250px;
+        border-radius: 8px;
+    }
+    .payment-image.loaded {
+        opacity: 1;
+    }
+    .payment-image:not(.loaded) {
+        opacity: 0;
+    }
+    .payment-image.loading {
+        background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+        background-size: 200% 100%;
+        animation: shimmer 1.5s infinite;
+    }
+    @keyframes shimmer {
+        0% { background-position: -200% 0; }
+        100% { background-position: 200% 0; }
+    }
+    </style>
 </head>
 <body>
 
@@ -264,6 +306,26 @@ if ($ajax && ($_GET['section'] ?? '') === 'payment-status') {
     </div>
 
     <script>
+    // Image loading handler for payment images
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.payment-image').forEach(function(img) {
+            img.classList.add('loading');
+            if (img.complete) {
+                img.classList.remove('loading');
+                img.classList.add('loaded');
+            } else {
+                img.addEventListener('load', function() {
+                    this.classList.remove('loading');
+                    this.classList.add('loaded');
+                });
+                img.addEventListener('error', function() {
+                    this.classList.remove('loading');
+                    this.classList.add('loaded');
+                });
+            }
+        });
+    });
+
     // Track if upload is in progress or completed
     var uploadInProgress = false;
     var uploadCompleted = false;
@@ -280,6 +342,23 @@ if ($ajax && ($_GET['section'] ?? '') === 'payment-status') {
             })
             .then(function(html) {
                 paymentStatusNode.innerHTML = html;
+                // Re-apply image loading to new images
+                document.querySelectorAll('.payment-image').forEach(function(img) {
+                    img.classList.add('loading');
+                    if (img.complete) {
+                        img.classList.remove('loading');
+                        img.classList.add('loaded');
+                    } else {
+                        img.addEventListener('load', function() {
+                            this.classList.remove('loading');
+                            this.classList.add('loaded');
+                        });
+                        img.addEventListener('error', function() {
+                            this.classList.remove('loading');
+                            this.classList.add('loaded');
+                        });
+                    }
+                });
                 // Reset upload state after refresh
                 uploadInProgress = false;
                 uploadCompleted = false;
@@ -496,6 +575,23 @@ if ($ajax && ($_GET['section'] ?? '') === 'payment-status') {
                         const targetNode = document.querySelector(targetSelector);
                         if (targetNode) {
                             targetNode.innerHTML = html;
+                            // Re-apply image loading to new images
+                            document.querySelectorAll('.payment-image').forEach(function(img) {
+                                img.classList.add('loading');
+                                if (img.complete) {
+                                    img.classList.remove('loading');
+                                    img.classList.add('loaded');
+                                } else {
+                                    img.addEventListener('load', function() {
+                                        this.classList.remove('loading');
+                                        this.classList.add('loaded');
+                                    });
+                                    img.addEventListener('error', function() {
+                                        this.classList.remove('loading');
+                                        this.classList.add('loaded');
+                                    });
+                                }
+                            });
                             // Reset upload state after refresh
                             uploadInProgress = false;
                             uploadCompleted = false;

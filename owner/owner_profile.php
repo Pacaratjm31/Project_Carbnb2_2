@@ -118,6 +118,7 @@ function build_owner_upload_path($value): string {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Owner Profile</title>
   <link rel="stylesheet" href="css/owner_style.css?v=20260702">
+  <link rel="stylesheet" href="css/owner_responsive.css?v=20260803">
 </head>
 <body>
   <div class="overlay"></div>
@@ -181,7 +182,11 @@ function build_owner_upload_path($value): string {
             <?php endif; ?>
             <form method="post" enctype="multipart/form-data" style="margin-top: 10px;">
               <input type="hidden" name="document_type" value="drivers_license">
-              <input type="file" name="document" accept=".jpg,.jpeg,.png,.pdf" required>
+              <div class="file-upload-wrap">
+                <input type="file" name="document" id="docDriversLicense" accept=".jpg,.jpeg,.png,.pdf" class="file-input-hidden" required>
+                <label for="docDriversLicense" class="file-upload-btn">Choose File</label>
+                <span class="file-upload-name">No file chosen</span>
+              </div>
               <button class="primary" type="submit" style="margin-top: 8px; font-size: 0.85rem; padding: 6px 12px;">Upload New</button>
             </form>
           </div>
@@ -195,7 +200,11 @@ function build_owner_upload_path($value): string {
             <?php endif; ?>
             <form method="post" enctype="multipart/form-data" style="margin-top: 10px;">
               <input type="hidden" name="document_type" value="nbi_clearance">
-              <input type="file" name="document" accept=".jpg,.jpeg,.png,.pdf" required>
+              <div class="file-upload-wrap">
+                <input type="file" name="document" id="docNbiClearance" accept=".jpg,.jpeg,.png,.pdf" class="file-input-hidden" required>
+                <label for="docNbiClearance" class="file-upload-btn">Choose File</label>
+                <span class="file-upload-name">No file chosen</span>
+              </div>
               <button class="primary" type="submit" style="margin-top: 8px; font-size: 0.85rem; padding: 6px 12px;">Upload New</button>
             </form>
           </div>
@@ -209,7 +218,11 @@ function build_owner_upload_path($value): string {
             <?php endif; ?>
             <form method="post" enctype="multipart/form-data" style="margin-top: 10px;">
               <input type="hidden" name="document_type" value="intro_video">
-              <input type="file" name="document" accept="video/*" required>
+              <div class="file-upload-wrap">
+                <input type="file" name="document" id="docIntroVideo" accept="video/*" class="file-input-hidden" required>
+                <label for="docIntroVideo" class="file-upload-btn">Choose File</label>
+                <span class="file-upload-name">No file chosen</span>
+              </div>
               <button class="primary" type="submit" style="margin-top: 8px; font-size: 0.85rem; padding: 6px 12px;">Upload New</button>
             </form>
           </div>
@@ -218,6 +231,29 @@ function build_owner_upload_path($value): string {
     </main>
   </div>
 
+  <!-- ============================================
+       MOBILE FILE UPLOAD (all 3 document forms)
+       Same .file-upload-wrap pattern as add_vehicle.php's
+       Vehicle Image field - hides the native <input
+       type="file"> and swaps in a full-width, thumb-friendly
+       button with a live filename readout. One shared script
+       wires up every .file-input-hidden on the page instead
+       of repeating the listener three times.
+  ============================================ -->
+  <script>
+    (function () {
+      document.querySelectorAll('.file-input-hidden').forEach(function (input) {
+        var nameEl = input.parentElement.querySelector('.file-upload-name');
+        if (!nameEl) return;
+
+        input.addEventListener('change', function () {
+          nameEl.textContent = (input.files && input.files.length > 0)
+            ? input.files[0].name
+            : 'No file chosen';
+        });
+      });
+    })();
+  </script>
   <script src="js/owner_script.js"></script>
 </body>
 </html>

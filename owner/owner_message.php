@@ -150,6 +150,7 @@ try {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Owner Messages</title>
   <link rel="stylesheet" href="css/owner_style.css?v=20260702">
+  <link rel="stylesheet" href="css/owner_responsive.css?v=20260803">
 </head>
 <body>
   <div class="overlay"></div>
@@ -259,7 +260,7 @@ try {
         <form method="POST" id="newMessageForm">
           <input type="hidden" name="send_new_message" value="1">
           <?= form_token_input('send_new_message') ?>
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+          <div class="form-grid-2" style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
 <div class="form-group">
               <label>Select Recipient</label>
               <select name="renter_id" class="form-control" required>
@@ -292,7 +293,7 @@ try {
         <?php if (empty($messages)) : ?>
           <p class="empty-state">No messages yet.</p>
         <?php else : ?>
-          <div class="table-wrapper">
+          <div class="table-wrapper only-desktop">
             <table class="table">
               <thead>
                 <tr>
@@ -339,44 +340,113 @@ try {
               </tbody>
             </table>
           </div>
+
+          <!-- ============================================
+               MOBILE INBOX CARDS
+               Same $messages data as the table above, card-
+               per-message for phones (same .only-desktop/
+               .only-mobile pattern used elsewhere). Reply
+               buttons here carry the same .reply-btn class +
+               data-id/data-message attributes as the desktop
+               version, so the existing querySelectorAll
+               binding at the bottom of this page wires them
+               up automatically - no extra JS needed.
+          ============================================ -->
+          <div class="message-cards only-mobile">
+            <?php foreach ($messages as $msg): ?>
+              <div class="message-card">
+                <div class="message-card-header">
+                  <?php if ($msg['sender_id'] == $owner['id']): ?>
+                    To: <?= clean($msg['receiver_name']) ?>
+                  <?php else: ?>
+                    From: <?= clean($msg['sender_name']) ?>
+                  <?php endif; ?>
+                </div>
+                <div class="message-card-body">
+                  <p class="message-card-text"><?= clean(substr($msg['message'], 0, 100)) ?><?= strlen($msg['message']) > 100 ? '...' : '' ?></p>
+                  <div class="message-card-row">
+                    <span class="label">Status</span>
+                    <span class="value">
+                      <span class="status-badge <?= $msg['is_read'] ? 'available' : 'pending' ?>"><?= $msg['is_read'] ? 'Read' : 'New' ?></span>
+                    </span>
+                  </div>
+                  <div class="message-card-row">
+                    <span class="label">Date</span>
+                    <span class="value"><?= format_date($msg['created_at']) ?></span>
+                  </div>
+                </div>
+                <div class="message-card-actions">
+                  <?php if ($msg['sender_id'] != $owner['id'] && !$msg['is_read']): ?>
+                    <form method="POST">
+                      <input type="hidden" name="mark_read" value="1">
+                      <input type="hidden" name="message_id" value="<?= $msg['id'] ?>">
+                      <button type="submit" class="action-btn-small approve" onclick="return confirm('Mark this message as read?')">Read</button>
+                    </form>
+                  <?php endif; ?>
+                  <?php if ($msg['sender_id'] != $owner['id']): ?>
+                    <button type="button" class="action-btn reply-btn" data-id="<?= $msg['id'] ?>" data-message="<?= htmlspecialchars(json_encode($msg['message']), ENT_QUOTES, 'UTF-8') ?>">Reply</button>
+                  <?php endif; ?>
+                </div>
+              </div>
+            <?php endforeach; ?>
+          </div>
         <?php endif; ?>
       </section>
     </main>
   </div>
 
   <!-- Reply Modal -->
-  <div id="replyModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:2000; align-items:center; justify-content:center;">
-    <div class="card" style="max-width:500px; width:90%; padding:20px; background:#2a2a2a; border-radius:12px;">
-      <h3 style="margin-bottom:15px; color:#ffd700;">Reply to Message</h3>
+  <!-- ============================================
+       Refactored onto the shared .modal / .modal-content
+       classes (same ones the admin panel and owner_reviews.php
+       use) instead of one-off inline styles, so it inherits
+       the mobile-width treatment once owner_style.css gets it.
+       BUG FIX: this form was missing the CSRF/form_token field
+       that reply_message's validate_form_token_or_error() call
+       requires - every reply submission was failing with
+       "Invalid or expired form submission." Added the same
+       hidden-token pattern owner_reviews.php's reply modal uses.
+  ============================================ -->
+  <div id="replyModal" class="modal" style="display:none;">
+    <div class="modal-content">
+      <h3>Reply to Message</h3>
       <form method="POST">
         <input type="hidden" name="message_id" id="messageId">
-        <div class="form-group" style="margin-bottom:15px;">
-          <label style="color:#aaa;">Original Message</label>
-          <p id="originalMessage" style="background:#1e1e1e; padding:10px; border-radius:6px; margin-bottom:10px; color:#cfcfcf;"></p>
+        <input type="hidden" name="form_token" id="replyFormToken">
+        <div class="form-group">
+          <label>Original Message</label>
+          <p id="originalMessage" style="background:rgba(255,255,255,0.04); padding:10px; border-radius:6px; color:var(--muted);"></p>
         </div>
-        <div class="form-group" style="margin-bottom:15px;">
-          <label style="color:#aaa;">Your Reply</label>
-          <textarea name="reply" id="replyText" rows="4" style="width:100%; padding:10px; border-radius:6px; border:1px solid #555; background:#1e1e1e; color:#cfcfcf;" required></textarea>
+        <div class="form-group">
+          <label>Your Reply</label>
+          <textarea name="reply" id="replyText" rows="4" class="form-control" required></textarea>
         </div>
-        <div style="display:flex; gap:10px;">
-          <button type="submit" class="primary" style="flex:1;">Send Reply</button>
-          <button type="button" onclick="closeReplyModal()" class="action-btn" style="flex:1;">Cancel</button>
+        <div class="modal-actions">
+          <button type="submit" class="primary">Send Reply</button>
+          <button type="button" onclick="closeReplyModal()" class="action-btn">Cancel</button>
         </div>
       </form>
     </div>
   </div>
 
   <script>
+    // Form token for the reply modal (see BUG FIX note above the modal markup)
+    const replyMessageFormToken = '<?= generate_form_token('reply_message') ?>';
+
     function openReplyModal(id, message) {
       var modal = document.getElementById('replyModal');
       var messageId = document.getElementById('messageId');
       var originalMessage = document.getElementById('originalMessage');
       var replyText = document.getElementById('replyText');
+      var replyFormToken = document.getElementById('replyFormToken');
       
       if (modal && messageId && originalMessage && replyText) {
         messageId.value = id;
         originalMessage.textContent = message;
         replyText.value = '';
+        if (replyFormToken) {
+          replyFormToken.value = replyMessageFormToken;
+        }
         modal.style.display = 'flex';
       } else {
         console.error('Modal elements not found');

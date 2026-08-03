@@ -129,6 +129,7 @@ $error = $error ?? '';
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Manage Vehicles</title>
   <link rel="stylesheet" href="css/owner_style.css?v=20260702">
+  <link rel="stylesheet" href="css/owner_responsive.css?v=20260803">
 </head>
 <body>
   <div class="overlay"></div>
@@ -171,7 +172,7 @@ $error = $error ?? '';
         <?php if (empty($vehicles)) : ?>
           <p class="empty-state">No vehicles registered yet.</p>
         <?php else : ?>
-          <div class="table-wrapper">
+          <div class="table-wrapper only-desktop">
             <table class="table">
               <thead>
                 <tr>
@@ -217,6 +218,61 @@ $error = $error ?? '';
                 <?php endforeach; ?>
               </tbody>
             </table>
+          </div>
+
+          <!-- ============================================
+               MOBILE VEHICLE CARDS
+               Same $vehicles data as the table above, card-
+               per-vehicle for phones (same .only-desktop/
+               .only-mobile pattern as booking_requests.php).
+               NOTE: like that page, this block renders once
+               on load and is not part of the 7s live-refresh
+               - only the desktop table auto-refreshes.
+          ============================================ -->
+          <div class="vehicle-list-cards only-mobile">
+            <?php foreach ($vehicles as $vehicle) : ?>
+              <div class="vehicle-list-card">
+                <div class="vehicle-list-card-header"><?php echo htmlspecialchars($vehicle['name']); ?></div>
+                <div class="vehicle-list-card-body">
+                  <div class="vehicle-list-card-row">
+                    <span class="label">Category</span>
+                    <span class="value"><?php echo htmlspecialchars(str_replace('_', ' ', $vehicle['category'])); ?></span>
+                  </div>
+                  <div class="vehicle-list-card-row">
+                    <span class="label">Price</span>
+                    <span class="value"><?php echo format_currency($vehicle['price_per_day']); ?>/day</span>
+                  </div>
+                  <div class="vehicle-list-card-row">
+                    <span class="label">Availability</span>
+                    <span class="value"><span class="status-badge <?php echo htmlspecialchars(status_badge_class($vehicle['availability_status'])); ?>"><?php echo htmlspecialchars(status_label($vehicle['availability_status'])); ?></span></span>
+                  </div>
+                  <div class="vehicle-list-card-row">
+                    <span class="label">Approval</span>
+                    <span class="value"><span class="status-badge <?php echo htmlspecialchars(approval_status_badge_class($vehicle['approval_status'])); ?>"><?php echo htmlspecialchars(approval_status_label($vehicle['approval_status'])); ?></span></span>
+                  </div>
+                </div>
+                <div class="vehicle-list-card-actions">
+                  <?php if ($vehicle['availability_status'] === 'available') : ?>
+                    <form method="POST" onsubmit="return confirm('Set this vehicle to maintenance?');">
+                      <input type="hidden" name="vehicle_id" value="<?php echo (int) $vehicle['id']; ?>">
+                      <button type="submit" name="set_maintenance" class="action-btn-small" style="background:#ffc107; color:#111;">Set Maintenance</button>
+                    </form>
+                  <?php endif; ?>
+                  <?php if ($vehicle['availability_status'] === 'rented') : ?>
+                    <form method="POST" onsubmit="return confirm('Make this vehicle available again?');">
+                      <input type="hidden" name="vehicle_id" value="<?php echo (int) $vehicle['id']; ?>">
+                      <button type="submit" name="make_available" class="action-btn-small approve">Make Available</button>
+                    </form>
+                  <?php endif; ?>
+                  <?php if ($vehicle['availability_status'] === 'maintenance') : ?>
+                    <form method="POST" onsubmit="return confirm('Remove maintenance and make this vehicle available in the market?');">
+                      <input type="hidden" name="vehicle_id" value="<?php echo (int) $vehicle['id']; ?>">
+                      <button type="submit" name="remove_maintenance" class="action-btn-small approve">Remove Maintenance</button>
+                    </form>
+                  <?php endif; ?>
+                </div>
+              </div>
+            <?php endforeach; ?>
           </div>
         <?php endif; ?>
       </section>

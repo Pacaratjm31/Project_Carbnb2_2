@@ -84,6 +84,51 @@ $categoryMap = [
 ];
 $normalizedFilter = $categoryMap[$filter] ?? '';
 
+// ============================================
+// AJAX endpoint for vehicle list refresh
+// ============================================
+$ajax = isset($_GET['ajax']) && $_GET['ajax'] === '1';
+if ($ajax && ($_GET['section'] ?? '') === 'vehicle-list') {
+    try {
+        $sql = "
+            SELECT v.id, v.name AS vehicle_name, v.price_per_day AS rate, v.image AS car_image,
+                   v.availability_status AS status, v.approval_status, v.approval_feedback AS rejection_reason,
+                   v.category, u.full_name AS owner_name
+            FROM vehicles v
+            JOIN users u ON v.owner_id = u.id
+            WHERE v.is_deleted = 0 AND v.approval_status = 'approved'
+        ";
+
+        if ($normalizedFilter !== '') {
+            $sql .= ' AND v.category = :category';
+        }
+
+        $sql .= ' ORDER BY v.created_at DESC';
+
+        $stmt = $conn->prepare($sql);
+
+        if ($normalizedFilter !== '') {
+            $stmt->execute(['category' => $normalizedFilter]);
+        } else {
+            $stmt->execute();
+        }
+
+        $cars = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        if (empty($cars)) {
+            echo '<div class="no-results"><h3>No vehicles found in this category.</h3><a href="browse.php" class="blue">View all cars</a></div>';
+        } else {
+            foreach ($cars as $car) {
+                renderCarCard($car, $user_id, $conn, $account_state);
+            }
+        }
+        exit;
+    } catch (PDOException $e) {
+        echo '<div class="no-results"><h3>Error loading vehicles</h3></div>';
+        exit;
+    }
+}
+
 try {
     $sql = "
         SELECT v.id, v.name AS vehicle_name, v.price_per_day AS rate, v.image AS car_image,
@@ -113,6 +158,107 @@ try {
     die('Database error: ' . $e->getMessage());
 }
 
+// ============================================
+// Function to render a car card (used by both AJAX and main page)
+// ============================================
+function renderCarCard($car, $user_id, $conn, $account_state) {
+    $status = $car['status'] ?? 'available';
+    $approval = $car['approval_status'] ?? 'pending';
+    $imgPath = build_vehicle_image_path($car['car_image'] ?? '');
+
+    if ($status === 'available') {
+        $label = 'Available';
+        $class = 'status-available';
+    } elseif ($status === 'rented') {
+        $label = 'In Use';
+        $class = 'status-inuse';
+    } else {
+        $label = 'Maintenance';
+        $class = 'status-maintenance';
+    }
+    
+    // Check if renter has a completed or returned booking for this vehicle
+    $hasCompletedBooking = false;
+    $hasReviewed = false;
+    if (!$account_state['restricted']) {
+        $stmt = $conn->prepare("SELECT id FROM bookings WHERE renter_id = ? AND vehicle_id = ? AND (status = 'completed' OR status = 'return_requested') LIMIT 1");
+        $stmt->execute([$user_id, $car['id']]);
+        $hasCompletedBooking = (bool) $stmt->fetch();
+        
+        // Check if already reviewed
+        $stmt = $conn->prepare("SELECT id FROM reviews WHERE renter_id = ? AND vehicle_id = ? LIMIT 1");
+        $stmt->execute([$user_id, $car['id']]);
+        $hasReviewed = (bool) $stmt->fetch();
+    }
+    
+    ?>
+    <div class="car-card" data-vehicle-id="<?= (int) $car['id'] ?>">
+        <div class="text-center">
+            <?php if ($approval === 'approved'): ?>
+                <span class="approval-badge bg-approved">Admin Approved</span>
+            <?php elseif ($approval === 'disapproved'): ?>
+                <span class="approval-badge bg-rejected">Admin Rejected</span>
+            <?php else: ?>
+                <span class="approval-badge bg-pending">Pending Review</span>
+            <?php endif; ?>
+        </div>
+
+        <img src="<?= htmlspecialchars($imgPath) ?>"
+             class="car-img"
+             alt="<?= htmlspecialchars($car['vehicle_name']) ?>"
+             loading="lazy"
+             decoding="async"
+             width="300"
+             height="200"
+             onerror="this.src='../uploads/vehicles/default-car.svg'; this.onerror=null;">
+
+        <h3><?= htmlspecialchars($car['vehicle_name']) ?></h3>
+
+        <div class="car-details">
+            <p><strong>Category:</strong> <?= htmlspecialchars(str_replace('_', ' ', $car['category'] ?? '')) ?></p>
+            <p><strong>Owner:</strong> <?= htmlspecialchars($car['owner_name']) ?></p>
+            <p><strong>Rate:</strong> ₱<?= number_format((float) $car['rate'], 2) ?>/day</p>
+        </div>
+
+        <span class="status <?= $class ?>">
+            <?= $label ?>
+        </span>
+
+        <div class="card-actions">
+            <div class="action-buttons">
+                <a href="vehicle_details.php?car_id=<?= (int) $car['id'] ?>" class="book-btn">View Details</a><br><br>
+                <a href="comment_rate.php?vehicle_id=<?= (int) $car['id'] ?>" class="book-btn" style="background:#17a2b8;">Comment & Rate</a><br><br>
+                <?php if ($account_state['restricted']): ?>
+                    <button class="book-btn disabled" disabled>
+                        <?= $account_state['status'] === 'disapproved' ? 'Access Restricted' : 'Approval Pending' ?>
+                    </button>
+                <?php elseif ($approval === 'approved'): ?>
+                    <?php if ($status === 'available'): ?>
+                        <a href="book.php?car_id=<?= (int) $car['id'] ?>" class="book-btn">Book Now</a><br><br>
+                    <?php endif; ?>
+                    <?php if ($hasCompletedBooking && !$hasReviewed): ?>
+                        <a href="commet_rate.php?vehicle_id=<?= (int) $car['id'] ?>" class="book-btn" style="background:#17a2b8;">
+                            Rate & Comment
+                        </a><br><br>
+                    <?php elseif ($hasReviewed): ?>
+                        <button class="book-btn disabled" disabled>Review Submitted</button>
+                    <?php endif; ?>
+                <?php elseif ($approval === 'disapproved'): ?>
+                    <button class="book-btn disabled" disabled>Rejected</button>
+                    <p class="rejection-text">
+                        Reason: <?= htmlspecialchars($car['rejection_reason'] ?? 'Contact admin') ?>
+                    </p>
+                <?php elseif ($approval === 'pending'): ?>
+                    <button class="book-btn disabled" disabled>Wait for Approval</button>
+                <?php else: ?>
+                    <button class="book-btn disabled" disabled>Unavailable</button>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+    <?php
+}
+
 function build_vehicle_image_path($value): string {
     if (empty($value)) {
         return '../uploads/vehicles/default-car.svg';
@@ -133,7 +279,6 @@ function build_vehicle_image_path($value): string {
     return '../uploads/vehicles/' . basename($value);
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -143,6 +288,44 @@ function build_vehicle_image_path($value): string {
 <link rel="stylesheet" href="../bootstrap-5.3.8-dist/css/bootstrap.min.css">
 <link rel="stylesheet" href="css/renter_style.css?v=4">
 <link rel="stylesheet" href="css/renter_style_backup.css?v=4">
+<style>
+/* Lazy loading placeholder */
+.car-img {
+    background: #f0f0f0;
+    min-height: 200px;
+    transition: opacity 0.3s ease;
+    object-fit: cover;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16/10;
+}
+.car-img.loaded {
+    opacity: 1;
+}
+.car-img:not(.loaded) {
+    opacity: 0;
+}
+
+/* Loading shimmer effect */
+.car-img.loading {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+
+/* Image container for better loading */
+.image-container {
+    position: relative;
+    overflow: hidden;
+    border-radius: 8px;
+    background: #f0f0f0;
+}
+</style>
 </head>
 <body data-user-id="<?php echo (int) $user_id; ?>" data-current-status="<?php echo htmlspecialchars($renter['status'] ?? 'pending'); ?>">
 
@@ -224,14 +407,14 @@ function build_vehicle_image_path($value): string {
     </div>
 
 <div class="filter-bar">
-    <a href="browse.php">All</a>
-    <a href="browse.php?seater=4-5">4-5 Seater</a>
-    <a href="browse.php?seater=6-7">6-7 Seater</a>
-    <a href="browse.php?seater=8-9">8-9 Seater</a>
-    <a href="browse.php?seater=10+">10+ Seater</a>
+    <a href="browse.php" data-filter="all" class="<?= empty($normalizedFilter) ? 'active' : '' ?>">All</a>
+    <a href="browse.php?seater=4-5" data-filter="4-5" class="<?= $normalizedFilter === '4-5_seater' ? 'active' : '' ?>">4-5 Seater</a>
+    <a href="browse.php?seater=6-7" data-filter="6-7" class="<?= $normalizedFilter === '6-7_seater' ? 'active' : '' ?>">6-7 Seater</a>
+    <a href="browse.php?seater=8-9" data-filter="8-9" class="<?= $normalizedFilter === '8-9_seater' ? 'active' : '' ?>">8-9 Seater</a>
+    <a href="browse.php?seater=10+" data-filter="10+" class="<?= $normalizedFilter === '10+_seater' ? 'active' : '' ?>">10+ Seater</a>
 </div>
 
-<div class="car-container">
+<div class="car-container" id="carContainer">
 
 <?php if (empty($cars)): ?>
     <div class="no-results">
@@ -242,102 +425,7 @@ function build_vehicle_image_path($value): string {
 <?php else: ?>
 
 <?php foreach ($cars as $car): ?>
-
-<?php
-    $status = $car['status'] ?? 'available';
-    $approval = $car['approval_status'] ?? 'pending';
-    $imgPath = build_vehicle_image_path($car['car_image'] ?? '');
-
-    if ($status === 'available') {
-        $label = 'Available';
-        $class = 'status-available';
-    } elseif ($status === 'rented') {
-        $label = 'In Use';
-        $class = 'status-inuse';
-    } else {
-        $label = 'Maintenance';
-        $class = 'status-maintenance';
-    }
-?>
-
-    <div class="car-card">
-
-        <div class="text-center">
-            <?php if ($approval === 'approved'): ?>
-                <span class="approval-badge bg-approved">Admin Approved</span>
-            <?php elseif ($approval === 'disapproved'): ?>
-                <span class="approval-badge bg-rejected">Admin Rejected</span>
-            <?php else: ?>
-                <span class="approval-badge bg-pending">Pending Review</span>
-            <?php endif; ?>
-        </div>
-
-        <img src="<?= htmlspecialchars($imgPath) ?>"
-             class="car-img"
-             alt="Car Image"
-             onerror="this.src='../uploads/vehicles/default-car.svg'">
-
-        <h3><?= htmlspecialchars($car['vehicle_name']) ?></h3>
-
-        <div class="car-details">
-            <p><strong>Category:</strong> <?= htmlspecialchars(str_replace('_', ' ', $car['category'] ?? '')) ?></p>
-            <p><strong>Owner:</strong> <?= htmlspecialchars($car['owner_name']) ?></p>
-            <p><strong>Rate:</strong> ₱<?= number_format((float) $car['rate'], 2) ?>/day</p>
-        </div>
-
-        <span class="status <?= $class ?>">
-            <?= $label ?>
-        </span>
-
-<div class="card-actions">
-             <div class="action-buttons">
-                 <a href="vehicle_details.php?car_id=<?= (int) $car['id'] ?>" class="book-btn">View Details</a><br><br>
-                 <a href="comment_rate.php?vehicle_id=<?= (int) $car['id'] ?>" class="book-btn" style="background:#17a2b8;">Comment & Rate</a><br><br>
-                 <?php if ($account_state['restricted']): ?>
-                     <button class="book-btn disabled" disabled>
-                         <?= $account_state['status'] === 'disapproved' ? 'Access Restricted' : 'Approval Pending' ?>
-                     </button>
-                 <?php elseif ($approval === 'approved'): ?>
-                     <?php if ($status === 'available'): ?>
-                         <a href="book.php?car_id=<?= (int) $car['id'] ?>" class="book-btn">Book Now</a><br><br>
-                     <?php endif; ?>
-                     <?php
-// Check if renter has a completed or returned booking for this vehicle
-                      $hasCompletedBooking = false;
-                      $hasReviewed = false;
-                      if (!$account_state['restricted']) {
-                          $stmt = $conn->prepare("SELECT id FROM bookings WHERE renter_id = ? AND vehicle_id = ? AND (status = 'completed' OR status = 'return_requested') LIMIT 1");
-                          $stmt->execute([$user_id, $car['id']]);
-                          $hasCompletedBooking = (bool) $stmt->fetch();
-                          
-                          // Check if already reviewed
-                          $stmt = $conn->prepare("SELECT id FROM reviews WHERE renter_id = ? AND vehicle_id = ? LIMIT 1");
-                          $stmt->execute([$user_id, $car['id']]);
-                          $hasReviewed = (bool) $stmt->fetch();
-                      }
-                     ?>
-                     <?php if ($hasCompletedBooking && !$hasReviewed): ?>
-                         <a href="commet_rate.php?vehicle_id=<?= (int) $car['id'] ?>" class="book-btn" style="background:#17a2b8;">
-                             Rate & Comment
-                         </a><br><br>
-                     <?php elseif ($hasReviewed): ?>
-                         <button class="book-btn disabled" disabled>Review Submitted</button>
-                     <?php endif; ?>
-                 <?php elseif ($approval === 'disapproved'): ?>
-                     <button class="book-btn disabled" disabled>Rejected</button>
-                     <p class="rejection-text">
-                         Reason: <?= htmlspecialchars($car['rejection_reason'] ?? 'Contact admin') ?>
-                     </p>
-                 <?php elseif ($approval === 'pending'): ?>
-                     <button class="book-btn disabled" disabled>Wait for Approval</button>
-                 <?php else: ?>
-                     <button class="book-btn disabled" disabled>Unavailable</button>
-                 <?php endif; ?>
-             </div>
-         </div>
-
-    </div>
-
+    <?php renderCarCard($car, $user_id, $conn, $account_state); ?>
 <?php endforeach; ?>
 
 <?php endif; ?>
@@ -367,6 +455,76 @@ function build_vehicle_image_path($value): string {
     const mobileMenuBtn = document.getElementById("mobileMenuBtn");
     const mobileMenu = document.getElementById("mobileMenu");
 
+    const carContainer = document.getElementById("carContainer");
+    const currentFilter = new URLSearchParams(window.location.search).get('seater') || 'all';
+
+    // ==========================
+    // IMAGE LAZY LOADING & FALLBACK
+    // ==========================
+    function handleImageLoad(img) {
+        img.classList.remove('loading');
+        img.classList.add('loaded');
+    }
+
+    function handleImageError(img) {
+        img.classList.remove('loading');
+        img.classList.add('loaded');
+        // Fallback to default image
+        if (!img.src.includes('default-car.svg')) {
+            img.src = '../uploads/vehicles/default-car.svg';
+        }
+    }
+
+    document.querySelectorAll('.car-img').forEach(function(img) {
+        // Add loading class for shimmer effect
+        img.classList.add('loading');
+        
+        // If image is already loaded (cached), mark as loaded immediately
+        if (img.complete) {
+            handleImageLoad(img);
+        } else {
+            img.addEventListener('load', function() { handleImageLoad(img); });
+            img.addEventListener('error', function() { handleImageError(img); });
+        }
+    });
+
+    // ==========================
+    // AUTO-REFRESH VEHICLE LIST (every 30 seconds)
+    // ==========================
+    function refreshVehicleList() {
+        if (!carContainer) return;
+        
+        var filterParam = currentFilter !== 'all' ? '&seater=' + encodeURIComponent(currentFilter) : '';
+        var url = 'browse.php?ajax=1&section=vehicle-list' + filterParam;
+        
+        fetch(url)
+            .then(function(response) {
+                return response.text();
+            })
+            .then(function(html) {
+                // Only update if we got content
+                if (html.trim().length > 0) {
+                    carContainer.innerHTML = html;
+                    // Re-apply lazy loading for new images
+                    document.querySelectorAll('.car-img').forEach(function(img) {
+                        img.classList.add('loading');
+                        if (img.complete) {
+                            handleImageLoad(img);
+                        } else {
+                            img.addEventListener('load', function() { handleImageLoad(img); });
+                            img.addEventListener('error', function() { handleImageError(img); });
+                        }
+                    });
+                }
+            })
+            .catch(function(error) {
+                console.log('Auto-refresh failed:', error);
+            });
+    }
+
+    // Start auto-refresh every 30 seconds
+    setInterval(refreshVehicleList, 30000);
+
     // ==========================
     // MOBILE MENU
     // ==========================
@@ -384,13 +542,11 @@ function build_vehicle_image_path($value): string {
 
         });
 
-        // close if screen becomes desktop
         window.addEventListener("resize", function () {
 
             if (window.innerWidth > 768) {
 
                 mobileMenu.classList.remove("show");
-
                 mobileMenuBtn.innerHTML = "☰ Menu";
 
             }
@@ -413,11 +569,9 @@ function build_vehicle_image_path($value): string {
                     if (data.status === "approved") {
 
                         clearInterval(pollInterval);
-
                         location.reload();
 
                     }
-
                     else if (data.status === "disapproved") {
 
                         statusBadge.textContent = "Disapproved";
@@ -461,19 +615,14 @@ function build_vehicle_image_path($value): string {
             if (trackingTimer) {
 
                 clearInterval(trackingTimer);
-
                 trackingTimer = null;
 
             }
 
             isTracking = false;
-
             shareBtn.disabled = false;
-
             shareBtn.textContent = "Share Live Location";
-
-            locationStatus.textContent =
-                "Live tracking stopped.";
+            locationStatus.textContent = "Live tracking stopped.";
 
         }
 
@@ -494,22 +643,16 @@ function build_vehicle_image_path($value): string {
             fetch("../api/location_tracker.php", {
 
                 method: "POST",
-
                 headers: {
-
-                    "Content-Type":
-                        "application/x-www-form-urlencoded"
-
+                    "Content-Type": "application/x-www-form-urlencoded"
                 },
-
                 body: payload.toString()
 
             })
 
             .then(async response => {
 
-                const data =
-                    await response.json().catch(() => ({}));
+                const data = await response.json().catch(() => ({}));
 
                 if (!response.ok || !data.success) {
 
@@ -549,13 +692,9 @@ function build_vehicle_image_path($value): string {
             }
 
             isTracking = true;
-
             shareBtn.disabled = true;
-
             shareBtn.textContent = "Tracking...";
-
-            locationStatus.textContent =
-                "Requesting your GPS position...";
+            locationStatus.textContent = "Requesting your GPS position...";
 
             navigator.geolocation.getCurrentPosition(
 
@@ -571,14 +710,10 @@ function build_vehicle_image_path($value): string {
 
                             function (error) {
 
-                                let message =
-                                    "Unable to refresh GPS location.";
+                                let message = "Unable to refresh GPS location.";
 
                                 if (error.code === 1) {
-
-                                    message =
-                                        "Location permission denied.";
-
+                                    message = "Location permission denied.";
                                 }
 
                                 locationStatus.textContent = message;
@@ -586,11 +721,9 @@ function build_vehicle_image_path($value): string {
                             },
 
                             {
-
                                 enableHighAccuracy: true,
                                 timeout: 15000,
                                 maximumAge: 10000
-
                             }
 
                         );
@@ -601,45 +734,28 @@ function build_vehicle_image_path($value): string {
 
                 function (error) {
 
-                    let message =
-                        "Unable to access GPS.";
+                    let message = "Unable to access GPS.";
 
                     if (error.code === 1) {
-
-                        message =
-                            "Location permission denied.";
-
+                        message = "Location permission denied.";
                     }
-
                     else if (error.code === 2) {
-
-                        message =
-                            "Location unavailable.";
-
+                        message = "Location unavailable.";
                     }
-
                     else if (error.code === 3) {
-
-                        message =
-                            "Location request timed out.";
-
+                        message = "Location request timed out.";
                     }
 
                     locationStatus.textContent = message;
-
                     shareBtn.disabled = false;
-
-                    shareBtn.textContent =
-                        "Share Live Location";
+                    shareBtn.textContent = "Share Live Location";
 
                 },
 
                 {
-
                     enableHighAccuracy: true,
                     timeout: 20000,
                     maximumAge: 0
-
                 }
 
             );
@@ -649,15 +765,10 @@ function build_vehicle_image_path($value): string {
         shareBtn.addEventListener("click", function () {
 
             if (isTracking) {
-
                 stopTracking();
-
             }
-
             else {
-
                 startTracking();
-
             }
 
         });

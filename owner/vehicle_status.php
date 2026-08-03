@@ -66,6 +66,7 @@ if ($ajax && ($_GET['section'] ?? '') === 'vehicle-status') {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Vehicle Status</title>
   <link rel="stylesheet" href="css/owner_style.css?v=20260702">
+  <link rel="stylesheet" href="css/owner_responsive.css?v=20260803">
 </head>
 <body>
   <div class="overlay"></div>
@@ -115,7 +116,7 @@ if ($ajax && ($_GET['section'] ?? '') === 'vehicle-status') {
       <?php if (!empty($maintenance_vehicles)): ?>
       <section class="card" style="margin-top:20px;" id="owner-maintenance-list">
         <h3 class="section-title">Vehicles Under Maintenance</h3>
-        <div class="table-wrapper">
+        <div class="table-wrapper only-desktop">
           <table class="table">
             <thead>
               <tr>
@@ -136,6 +137,35 @@ if ($ajax && ($_GET['section'] ?? '') === 'vehicle-status') {
               <?php endforeach; ?>
             </tbody>
           </table>
+        </div>
+
+        <!-- ============================================
+             MOBILE MAINTENANCE CARDS
+             Same $maintenance_vehicles data, card-per-vehicle
+             for phones (same .only-desktop/.only-mobile
+             pattern used across the owner panel). Read-only
+             list, no actions to stack.
+        ============================================ -->
+        <div class="maintenance-cards only-mobile">
+          <?php foreach ($maintenance_vehicles as $vehicle): ?>
+            <div class="maintenance-card">
+              <div class="maintenance-card-header"><?php echo htmlspecialchars($vehicle['name']); ?></div>
+              <div class="maintenance-card-body">
+                <div class="maintenance-card-row">
+                  <span class="label">Category</span>
+                  <span class="value"><?php echo htmlspecialchars(str_replace('_', ' ', $vehicle['category'])); ?></span>
+                </div>
+                <div class="maintenance-card-row">
+                  <span class="label">Price</span>
+                  <span class="value"><?php echo format_currency($vehicle['price_per_day']); ?>/day</span>
+                </div>
+                <div class="maintenance-card-row">
+                  <span class="label">Status</span>
+                  <span class="value"><span class="status-badge pending"><?php echo htmlspecialchars(status_label($vehicle['availability_status'])); ?></span></span>
+                </div>
+              </div>
+            </div>
+          <?php endforeach; ?>
         </div>
       </section>
       <?php endif; ?>

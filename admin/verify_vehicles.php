@@ -9,7 +9,8 @@ if ($ajax && ($_GET['section'] ?? '') === 'pending-vehicles') {
       echo '<div class="vehicle-card">';
       echo '<div class="vehicle-image">';
       if (!empty($vehicle['image'])) {
-        echo '<img src="../' . clean($vehicle['image']) . '" alt="' . clean($vehicle['name']) . '">';
+        // Add loading="lazy" and decoding="async" to images
+        echo '<img src="../' . clean($vehicle['image']) . '" alt="' . clean($vehicle['name']) . '" loading="lazy" decoding="async" onerror="this.src=\'../uploads/vehicles/default-car.svg\'">';
       } else {
         echo '<div class="no-image">No Image</div>';
       }
@@ -51,6 +52,31 @@ if ($ajax && ($_GET['section'] ?? '') === 'pending-vehicles') {
   <link rel="stylesheet" href="css/admin_style.css?v=20260702">
   <link rel="stylesheet" href="css/admin_style_backup.css?v=20260702">
   <link rel="stylesheet" href="css/admin_responsive.css?v=20260801">
+  <style>
+    /* Image loading styles */
+    .vehicle-image img {
+      background: #f0f0f0;
+      transition: opacity 0.3s ease;
+      object-fit: cover;
+      width: 100%;
+      height: 100%;
+    }
+    .vehicle-image img.loaded {
+      opacity: 1;
+    }
+    .vehicle-image img:not(.loaded) {
+      opacity: 0;
+    }
+    .vehicle-image img.loading {
+      background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+    }
+    @keyframes shimmer {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+  </style>
 </head>
 <body>
   <div class="overlay"></div>
@@ -111,7 +137,11 @@ if ($ajax && ($_GET['section'] ?? '') === 'pending-vehicles') {
             <div class="vehicle-card">
               <div class="vehicle-image">
                 <?php if (!empty($vehicle['image'])): ?>
-                  <img src="../<?= clean($vehicle['image']) ?>" alt="<?= clean($vehicle['name']) ?>">
+                  <img src="../<?= clean($vehicle['image']) ?>" 
+                       alt="<?= clean($vehicle['name']) ?>"
+                       loading="lazy"
+                       decoding="async"
+                       onerror="this.src='../uploads/vehicles/default-car.svg'">
                 <?php else: ?>
                   <div class="no-image">No Image</div>
                 <?php endif; ?>
@@ -196,6 +226,27 @@ if ($ajax && ($_GET['section'] ?? '') === 'pending-vehicles') {
   </div>
 
   <script>
+    // Image loading handler
+    document.addEventListener('DOMContentLoaded', function () {
+      document.querySelectorAll('.vehicle-image img').forEach(function(img) {
+        img.classList.add('loading');
+        if (img.complete) {
+          img.classList.remove('loading');
+          img.classList.add('loaded');
+        } else {
+          img.addEventListener('load', function() {
+            this.classList.remove('loading');
+            this.classList.add('loaded');
+          });
+          img.addEventListener('error', function() {
+            this.classList.remove('loading');
+            this.classList.add('loaded');
+          });
+        }
+      });
+    });
+
+    // Sidebar functionality
     document.addEventListener('DOMContentLoaded', function () {
       const sidebar = document.querySelector('.sidebar');
       const overlay = document.querySelector('.overlay');
@@ -241,24 +292,59 @@ if ($ajax && ($_GET['section'] ?? '') === 'pending-vehicles') {
       });
     });
 
+    // Live refresh with improved error handling
     (function () {
       const liveTarget = document.getElementById('admin-pending-vehicles');
       if (!liveTarget || !liveTarget.dataset.liveRefresh) return;
 
       const refreshUrl = liveTarget.dataset.liveRefresh;
-      const refreshSection = function () {
-        fetch(refreshUrl)
-          .then(function (response) { return response.text(); })
+      let refreshInterval;
+
+      function refreshSection() {
+        fetch(refreshUrl, {
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        })
+          .then(function (response) {
+            if (!response.ok) {
+              throw new Error('Network response was not ok');
+            }
+            return response.text();
+          })
           .then(function (html) {
             liveTarget.innerHTML = '<h3 class="section-title">Pending Vehicle Listings</h3>' + html;
+            // Re-apply image loading to new images
+            document.querySelectorAll('.vehicle-image img').forEach(function(img) {
+              img.classList.add('loading');
+              if (img.complete) {
+                img.classList.remove('loading');
+                img.classList.add('loaded');
+              } else {
+                img.addEventListener('load', function() {
+                  this.classList.remove('loading');
+                  this.classList.add('loaded');
+                });
+                img.addEventListener('error', function() {
+                  this.classList.remove('loading');
+                  this.classList.add('loaded');
+                });
+              }
+            });
           })
           .catch(function (error) {
             console.log('Vehicle verification live refresh failed:', error);
           });
-      };
+      }
 
       refreshSection();
-      setInterval(refreshSection, 8000);
+      refreshInterval = setInterval(refreshSection, 8000);
+
+      // Cleanup on page unload
+      window.addEventListener('beforeunload', function() {
+        clearInterval(refreshInterval);
+      });
     })();
 
     // Reject modal functions

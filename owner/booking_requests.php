@@ -45,6 +45,7 @@ if ($ajax && ($_GET['section'] ?? '') === 'booking-requests') {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Booking Requests</title>
   <link rel="stylesheet" href="css/owner_style.css?v=20260702">
+  <link rel="stylesheet" href="css/owner_responsive.css?v=20260803">
 </head>
 <body>
   <div class="overlay"></div>
@@ -81,7 +82,7 @@ if ($ajax && ($_GET['section'] ?? '') === 'booking-requests') {
         <?php if (empty($bookings)) : ?>
           <p class="empty-state">No booking requests found.</p>
         <?php else : ?>
-          <div class="table-wrapper">
+          <div class="table-wrapper only-desktop">
             <table class="table">
               <thead>
                 <tr>
@@ -104,6 +105,48 @@ if ($ajax && ($_GET['section'] ?? '') === 'booking-requests') {
                 <?php endforeach; ?>
               </tbody>
             </table>
+          </div>
+
+          <!-- ============================================
+               MOBILE BOOKING CARDS
+               Same $bookings data as the table above, just a
+               card-per-booking layout for phones (matches the
+               .only-desktop/.only-mobile pattern used on the
+               admin Rental Records page). NOTE: like the admin
+               version, this block is rendered once on page
+               load and is not wired into the 7s live-refresh
+               above - only the desktop table auto-refreshes.
+          ============================================ -->
+          <div class="booking-cards only-mobile">
+            <?php foreach ($bookings as $booking) : ?>
+              <div class="booking-card">
+                <div class="booking-card-header"><?php echo htmlspecialchars($booking['vehicle_name']); ?></div>
+                <div class="booking-card-body">
+                  <div class="booking-card-row">
+                    <span class="label">Renter</span>
+                    <span class="value"><?php echo htmlspecialchars($booking['renter_name']); ?></span>
+                  </div>
+                  <div class="booking-card-row">
+                    <span class="label">Pickup</span>
+                    <span class="value"><?php echo format_date($booking['start_date']); ?></span>
+                  </div>
+                  <div class="booking-card-row">
+                    <span class="label">Return</span>
+                    <span class="value"><?php echo format_date($booking['end_date']); ?></span>
+                  </div>
+                  <div class="booking-card-row">
+                    <span class="label">Price</span>
+                    <span class="value"><?php echo format_currency($booking['total_price']); ?></span>
+                  </div>
+                  <div class="booking-card-row">
+                    <span class="label">Status</span>
+                    <span class="value">
+                      <span class="status-badge <?php echo htmlspecialchars(status_badge_class($booking['status'])); ?>"><?php echo htmlspecialchars(status_label($booking['status'])); ?></span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            <?php endforeach; ?>
           </div>
         <?php endif; ?>
       </section>

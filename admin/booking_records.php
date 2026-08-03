@@ -151,9 +151,7 @@ if ($ajax && ($_GET['section'] ?? '') === 'booking-history') {
           </table>
         </div>
 
-        <!-- Mobile-only booking cards: same $records data, same status
-             logic as the table above, just a different markup shape for
-             screens 767px and below. Desktop table above is untouched. -->
+        <!-- Mobile-only booking cards -->
         <div class="booking-cards only-mobile">
           <?php if (empty($records)): ?>
             <p class="empty-state">No booking records found.</p>
@@ -234,6 +232,7 @@ if ($ajax && ($_GET['section'] ?? '') === 'booking-history') {
   </div>
 
   <script>
+    // Sidebar functionality
     document.addEventListener('DOMContentLoaded', function () {
       const sidebar = document.querySelector('.sidebar');
       const overlay = document.querySelector('.overlay');
@@ -279,14 +278,28 @@ if ($ajax && ($_GET['section'] ?? '') === 'booking-history') {
       });
     });
 
+    // Live refresh with improved error handling
     (function () {
       const liveTargets = document.querySelectorAll('[data-live-refresh]');
+      let refreshIntervals = [];
+
       liveTargets.forEach(function (node) {
         const refreshUrl = node.dataset.liveRefresh;
         const targetSelector = node.dataset.liveTarget || '#' + node.id;
-        const refreshSection = function () {
-          fetch(refreshUrl)
-            .then(function (response) { return response.text(); })
+
+        function refreshSection() {
+          fetch(refreshUrl, {
+            headers: {
+              'Cache-Control': 'no-cache',
+              'Pragma': 'no-cache'
+            }
+          })
+            .then(function (response) {
+              if (!response.ok) {
+                throw new Error('Network response was not ok');
+              }
+              return response.text();
+            })
             .then(function (html) {
               const targetNode = document.querySelector(targetSelector);
               if (targetNode) {
@@ -296,10 +309,21 @@ if ($ajax && ($_GET['section'] ?? '') === 'booking-history') {
             .catch(function (error) {
               console.log('Booking records live refresh failed:', error);
             });
-        };
+        }
 
+        // Initial refresh
         refreshSection();
-        setInterval(refreshSection, 8000);
+
+        // Set interval with cleanup
+        const intervalId = setInterval(refreshSection, 8000);
+        refreshIntervals.push(intervalId);
+      });
+
+      // Cleanup on page unload
+      window.addEventListener('beforeunload', function() {
+        refreshIntervals.forEach(function(id) {
+          clearInterval(id);
+        });
       });
     })();
 

@@ -46,6 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Add Vehicle</title>
   <link rel="stylesheet" href="css/owner_style.css?v=20260702">
+  <link rel="stylesheet" href="css/owner_responsive.css?v=20260803">
 </head>
 <body>
   <div class="overlay"></div>
@@ -106,18 +107,59 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               <option value="manual">Manual</option>
             </select>
           </label>
-          <label>Vehicle Image
-            <input type="file" name="image" accept="image/jpeg,image/png,image/webp" placeholder="Upload vehicle image">
-          </label>
+          <div class="form-group">
+            <label for="vehicleImage">Vehicle Image</label>
+            <!-- ============================================
+                 MOBILE FILE UPLOAD
+                 Native <input type="file"> renders as a tiny,
+                 hard-to-tap control on phones. This hides it
+                 and swaps in a full-width, thumb-friendly
+                 "Choose Image" button plus a live filename
+                 readout, driven by the script at the bottom
+                 of this page. Falls back to the plain input
+                 look until owner_style.css adds the
+                 .file-upload-* styling.
+            ============================================ -->
+            <div class="file-upload-wrap">
+              <input type="file" name="image" id="vehicleImage" accept="image/jpeg,image/png,image/webp" class="file-input-hidden">
+              <label for="vehicleImage" class="file-upload-btn">Choose Image</label>
+              <span class="file-upload-name" id="vehicleImageName">No file chosen</span>
+            </div>
+          </div>
           <label>Description
             <textarea name="description" rows="4" placeholder="Describe the vehicle"></textarea>
           </label>
-          <button class="primary" type="submit">Save Vehicle</button>
+          <!-- ============================================
+               MOBILE STICKY SAVE BAR
+               On desktop this is just the button in normal
+               flow. On mobile, owner_style.css will pin it to
+               the bottom of the screen so the Save action is
+               always reachable without scrolling through the
+               whole form.
+          ============================================ -->
+          <div class="form-actions-sticky">
+            <button class="primary" type="submit">Save Vehicle</button>
+          </div>
         </form>
       </section>
     </main>
   </div>
 
+  <script>
+    (function () {
+      var fileInput = document.getElementById('vehicleImage');
+      var fileName = document.getElementById('vehicleImageName');
+      if (!fileInput || !fileName) return;
+
+      fileInput.addEventListener('change', function () {
+        if (fileInput.files && fileInput.files.length > 0) {
+          fileName.textContent = fileInput.files[0].name;
+        } else {
+          fileName.textContent = 'No file chosen';
+        }
+      });
+    })();
+  </script>
   <script src="js/owner_script.js"></script>
 </body>
 </html>

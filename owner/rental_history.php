@@ -44,6 +44,7 @@ if ($ajax && ($_GET['section'] ?? '') === 'rental-history') {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Rental History</title>
   <link rel="stylesheet" href="css/owner_style.css?v=20260702">
+  <link rel="stylesheet" href="css/owner_responsive.css?v=20260803">
 </head>
 <body>
   <div class="overlay"></div>
@@ -80,7 +81,7 @@ if ($ajax && ($_GET['section'] ?? '') === 'rental-history') {
         <?php if (empty($history)) : ?>
           <p class="empty-state">No booking history found.</p>
         <?php else : ?>
-          <div class="table-wrapper">
+          <div class="table-wrapper only-desktop">
             <table class="table">
               <thead>
                 <tr>
@@ -103,6 +104,45 @@ if ($ajax && ($_GET['section'] ?? '') === 'rental-history') {
                 <?php endforeach; ?>
               </tbody>
             </table>
+          </div>
+
+          <!-- ============================================
+               MOBILE HISTORY CARDS
+               Same $history data as the table above, card-
+               per-booking for phones (same .only-desktop/
+               .only-mobile pattern used across the owner
+               panel). Read-only page - no actions to stack,
+               so no live-refresh limitation here either way
+               since desktop table already covers that.
+          ============================================ -->
+          <div class="history-cards only-mobile">
+            <?php foreach ($history as $item) : ?>
+              <div class="history-card">
+                <div class="history-card-header"><?php echo htmlspecialchars($item['vehicle_name']); ?></div>
+                <div class="history-card-body">
+                  <div class="history-card-row">
+                    <span class="label">Renter</span>
+                    <span class="value"><?php echo htmlspecialchars($item['renter_name']); ?></span>
+                  </div>
+                  <div class="history-card-row">
+                    <span class="label">Pickup</span>
+                    <span class="value"><?php echo format_date($item['start_date']); ?></span>
+                  </div>
+                  <div class="history-card-row">
+                    <span class="label">Return</span>
+                    <span class="value"><?php echo format_date($item['end_date']); ?></span>
+                  </div>
+                  <div class="history-card-row">
+                    <span class="label">Price</span>
+                    <span class="value"><?php echo format_currency($item['total_price']); ?></span>
+                  </div>
+                  <div class="history-card-row">
+                    <span class="label">Status</span>
+                    <span class="value"><span class="status-badge <?php echo htmlspecialchars(status_badge_class($item['status'])); ?>"><?php echo htmlspecialchars(status_label($item['status'])); ?></span></span>
+                  </div>
+                </div>
+              </div>
+            <?php endforeach; ?>
           </div>
         <?php endif; ?>
       </section>

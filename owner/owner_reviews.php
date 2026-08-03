@@ -62,6 +62,7 @@ $reviews = get_owner_reviews($pdo, $owner['id']);
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Owner Reviews | Carbnb</title>
   <link rel="stylesheet" href="css/owner_style.css?v=20260702">
+  <link rel="stylesheet" href="css/owner_responsive.css?v=20260803">
 </head>
 <body>
   <div class="overlay"></div>
@@ -107,7 +108,7 @@ $reviews = get_owner_reviews($pdo, $owner['id']);
         <?php if (empty($reviews)) : ?>
           <p class="empty-state">No reviews yet. Reviews from renters will appear here after they complete their bookings.</p>
 <?php else : ?>
-<div class="table-wrapper">
+<div class="table-wrapper only-desktop">
              <table class="table">
 <thead>
                 <tr>
@@ -150,37 +151,98 @@ $reviews = get_owner_reviews($pdo, $owner['id']);
               </tbody>
             </table>
           </div>
+
+          <!-- ============================================
+               MOBILE REVIEW CARDS
+               Same $reviews data as the table above, card-
+               per-review for phones (same .only-desktop/
+               .only-mobile pattern used across the owner
+               panel). Reply buttons call the same
+               openReplyModal(...) function as the desktop
+               version - no extra JS needed.
+          ============================================ -->
+          <div class="review-cards only-mobile">
+            <?php foreach ($reviews as $review): ?>
+              <div class="review-card">
+                <div class="review-card-header"><?= clean($review['renter_name']) ?></div>
+                <div class="review-card-body">
+                  <div class="review-card-row">
+                    <span class="label">Vehicle</span>
+                    <span class="value"><?= clean($review['vehicle_name'] ?: 'General Feedback') ?></span>
+                  </div>
+                  <div class="review-card-row">
+                    <span class="label">Rating</span>
+                    <span class="value">
+                      <?php if ($review['rating']): ?>
+                        <?php for ($i = 1; $i <= 5; $i++): ?>
+                          <?= $i <= $review['rating'] ? '★' : '☆' ?>
+                        <?php endfor; ?>
+                        (<?= $review['rating'] ?>/5)
+                      <?php else: ?>
+                        <em>No rating</em>
+                      <?php endif; ?>
+                    </span>
+                  </div>
+                  <div class="review-card-row">
+                    <span class="label">Comment</span>
+                    <span class="value"><?= clean($review['comment'] ?: 'No comment') ?></span>
+                  </div>
+                  <div class="review-card-row">
+                    <span class="label">Feedback</span>
+                    <span class="value"><?= clean($review['feedback'] ?: 'No feedback') ?></span>
+                  </div>
+                  <div class="review-card-row">
+                    <span class="label">Reply</span>
+                    <span class="value"><?= clean($review['reply'] ?: 'No reply yet') ?></span>
+                  </div>
+                  <div class="review-card-row">
+                    <span class="label">Date</span>
+                    <span class="value"><?= format_date($review['created_at']) ?></span>
+                  </div>
+                </div>
+                <div class="review-card-actions">
+                  <button class="action-btn" onclick="openReplyModal(<?= $review['id'] ?>, <?= htmlspecialchars(json_encode($review['renter_name']), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($review['comment'] ?? $review['feedback'] ?? ''), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($review['reply'] ?? ''), ENT_QUOTES) ?>)">Reply</button>
+                </div>
+              </div>
+            <?php endforeach; ?>
+          </div>
         <?php endif; ?>
       </section>
     </main>
   </div>
 
 <!-- Reply Modal -->
-  <div id="replyModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:2000; align-items:center; justify-content:center;">
-    <div style="display:flex; align-items:center; justify-content:center; height:100%; padding:20px;">
-      <div style="background:#2a2a2a; border-radius:12px; max-width:500px; width:100%; padding:20px;">
-        <h3 style="margin-bottom:15px; color:#ffd700;">Reply to Review</h3>
-<form method="POST" id="replyReviewForm">
-          <input type="hidden" name="reply" value="1">
-          <input type="hidden" name="review_id" id="reviewId">
-          <input type="hidden" name="form_token" id="replyFormToken">
-          <div style="margin-bottom:15px;">
-            <label style="color:#aaa; display:block; margin-bottom:5px;">Renter: <span id="renterName" style="color:#cfcfcf;"></span></label>
-          </div>
-          <div style="margin-bottom:15px;">
-            <label style="color:#aaa; display:block; margin-bottom:5px;">Original Review</label>
-            <p id="originalReview" style="background:#1e1e1e; padding:10px; border-radius:6px; margin-bottom:10px; color:#cfcfcf; min-height:40px;"></p>
-          </div>
-          <div style="margin-bottom:15px;">
-            <label style="color:#aaa; display:block; margin-bottom:5px;">Your Reply</label>
-            <textarea name="reply_text" id="replyText" rows="4" style="width:100%; padding:10px; border-radius:6px; border:1px solid #555; background:#1e1e1e; color:#cfcfcf; box-sizing:border-box;" required></textarea>
-          </div>
-          <div style="display:flex; gap:10px;">
-            <button type="submit" style="flex:1; background:#ffd700; color:#111; border:none; padding:10px; border-radius:6px; cursor:pointer;">Send Reply</button>
-            <button type="button" onclick="closeReplyModal()" style="flex:1; background:#444; color:#fff; border:none; padding:10px; border-radius:6px; cursor:pointer;">Cancel</button>
-          </div>
-        </form>
-      </div>
+  <!-- ============================================
+       Refactored onto the shared .modal / .modal-content /
+       .modal-actions classes (same ones owner_message.php now
+       uses) instead of the doubled-up inline-styled wrapper
+       divs, so it inherits the mobile-width treatment once
+       owner_style.css picks up those rules. Functionality
+       (form_token, field IDs) is unchanged.
+  ============================================ -->
+  <div id="replyModal" class="modal" style="display:none;">
+    <div class="modal-content">
+      <h3>Reply to Review</h3>
+      <form method="POST" id="replyReviewForm">
+        <input type="hidden" name="reply" value="1">
+        <input type="hidden" name="review_id" id="reviewId">
+        <input type="hidden" name="form_token" id="replyFormToken">
+        <div class="form-group">
+          <label>Renter: <span id="renterName"></span></label>
+        </div>
+        <div class="form-group">
+          <label>Original Review</label>
+          <p id="originalReview" style="background:rgba(255,255,255,0.04); padding:10px; border-radius:6px; color:var(--muted); min-height:40px;"></p>
+        </div>
+        <div class="form-group">
+          <label>Your Reply</label>
+          <textarea name="reply_text" id="replyText" rows="4" class="form-control" required></textarea>
+        </div>
+        <div class="modal-actions">
+          <button type="submit" class="primary">Send Reply</button>
+          <button type="button" onclick="closeReplyModal()" class="action-btn">Cancel</button>
+        </div>
+      </form>
     </div>
   </div>
 

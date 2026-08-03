@@ -32,6 +32,7 @@ $maintenance_count = (int) $stmt->fetchColumn();
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Owner Dashboard</title>
   <link rel="stylesheet" href="css/owner_style.css?v=20260702">
+  <link rel="stylesheet" href="css/owner_responsive.css?v=20260803">
 </head>
 <body data-user-id="<?php echo (int) $owner['id']; ?>" data-current-status="<?php echo htmlspecialchars($owner['status'] ?? 'pending'); ?>">
   <div class="overlay"></div>
@@ -98,7 +99,28 @@ $maintenance_count = (int) $stmt->fetchColumn();
         <p><strong>Note:</strong> <span id="approval-note"><?php echo htmlspecialchars(($owner['disapproval_reason'] ?? '') !== '' ? $owner['disapproval_reason'] : 'No admin note yet.'); ?></span></p>
       </section>
 
-<section class="stats-grid">
+<?php if (!$account_state['restricted']) : ?>
+      <!-- ============================================
+           MOBILE QUICK ACTIONS
+           Shortcut buttons to the most-used owner pages.
+           Lets phone users jump around without opening
+           the sidebar drawer every time. Uses .quick-actions
+           / .action-btn (same classes as the admin panel) -
+           full-width stacked buttons on mobile once
+           owner_style.css picks up the matching rules.
+      ============================================ -->
+      <section class="card" style="margin-bottom: 1.2rem;">
+        <h3 class="section-title">Quick Actions</h3>
+        <div class="quick-actions">
+          <a href="add_vehicle.php" class="action-btn">Add Vehicle</a>
+          <a href="manage_vehicles.php" class="action-btn">Manage Vehicles</a>
+          <a href="booking_requests.php" class="action-btn">Booking Requests</a>
+          <a href="owner_message.php" class="action-btn">Messages</a>
+        </div>
+      </section>
+      <?php endif; ?>
+
+      <section class="stats-grid">
         <div class="stat-box">
           <h3>Active Vehicles</h3>
           <p><?php echo (int) $stats['active_vehicles']; ?></p>

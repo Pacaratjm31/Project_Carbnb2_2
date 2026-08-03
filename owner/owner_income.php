@@ -26,6 +26,7 @@ $income = get_owner_income($pdo, $owner['id']);
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Owner Income</title>
   <link rel="stylesheet" href="css/owner_style.css?v=20260702">
+  <link rel="stylesheet" href="css/owner_responsive.css?v=20260803">
 </head>
 <body>
   <div class="overlay"></div>
@@ -57,6 +58,14 @@ $income = get_owner_income($pdo, $owner['id']);
     </header>
 
     <main class="page">
+      <!-- ============================================
+           NO MOBILE-SPECIFIC MARKUP NEEDED HERE
+           .stats-grid already uses
+           grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)),
+           which collapses to a single column on narrow
+           screens on its own - no dual markup, wrapper
+           classes, or JS required for this page.
+      ============================================ -->
       <section class="stats-grid">
         <div class="stat-box">
           <h3>This Month</h3>
