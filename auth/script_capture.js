@@ -20,6 +20,8 @@ document.addEventListener(
     const faceForm =
         document.getElementById("faceForm");
 
+    let isCapturing = false;
+
     try {
 
         statusMessage.textContent =
@@ -164,6 +166,9 @@ document.addEventListener(
         "click",
         async () => {
 
+        if (isCapturing) return;
+        isCapturing = true;
+
         captureBtn.disabled = true;
 
         statusMessage.textContent =
@@ -188,6 +193,8 @@ document.addEventListener(
 
             statusMessage.textContent =
                 "Face capture failed.";
+
+            isCapturing = false;
 
             return;
         }

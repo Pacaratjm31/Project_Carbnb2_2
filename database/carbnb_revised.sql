@@ -1,5 +1,8 @@
 USE carbnb;
 
+-- =====================================================
+-- USERS TABLE
+-- =====================================================
 CREATE TABLE users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     full_name VARCHAR(100) NOT NULL,
@@ -22,6 +25,9 @@ CREATE TABLE users (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- =====================================================
+-- USER DOCUMENTS TABLE
+-- =====================================================
 CREATE TABLE user_documents (
     id INT AUTO_INCREMENT PRIMARY KEY,
 
@@ -45,6 +51,9 @@ CREATE TABLE user_documents (
         ON DELETE CASCADE
 );
 
+-- =====================================================
+-- VEHICLES TABLE
+-- =====================================================
 CREATE TABLE vehicles (
     id INT AUTO_INCREMENT PRIMARY KEY,
     owner_id INT NOT NULL,
@@ -71,6 +80,9 @@ CREATE TABLE vehicles (
     FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+-- =====================================================
+-- BOOKINGS TABLE
+-- =====================================================
 CREATE TABLE bookings (
     id INT AUTO_INCREMENT PRIMARY KEY,
     renter_id INT NOT NULL,
@@ -91,13 +103,16 @@ CREATE TABLE bookings (
     FOREIGN KEY (admin_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
+-- =====================================================
+-- PAYMENTS TABLE
+-- =====================================================
 CREATE TABLE payments (
     id INT AUTO_INCREMENT PRIMARY KEY,
     booking_id INT NOT NULL,
 
     amount DECIMAL(10,2) NOT NULL,
     proof_image VARCHAR(255) NULL,
-    payment_method ENUM('gcash','paymaya','cash','bank_transfer') NULL,
+    payment_method ENUM('gcash','paymaya','cash','bank_transfer','xendit') NULL,
     transaction_reference VARCHAR(100) NULL,
     gateway_response TEXT NULL,
     paid_at DATETIME NULL,
@@ -106,9 +121,16 @@ CREATE TABLE payments (
 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
+    gateway_payment_id VARCHAR(255) NULL,
+    payment_url TEXT NULL,
+    gateway_status VARCHAR(50) NULL,
+
     FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE CASCADE
 );
 
+-- =====================================================
+-- EARNINGS TABLE
+-- =====================================================
 CREATE TABLE earnings (
     id INT AUTO_INCREMENT PRIMARY KEY,
     booking_id INT NOT NULL,
@@ -121,6 +143,9 @@ CREATE TABLE earnings (
     FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE CASCADE
 );
 
+-- =====================================================
+-- REVIEWS TABLE
+-- =====================================================
 CREATE TABLE reviews (
     id INT AUTO_INCREMENT PRIMARY KEY,
     renter_id INT NOT NULL,
@@ -139,6 +164,9 @@ CREATE TABLE reviews (
     FOREIGN KEY (vehicle_id) REFERENCES vehicles(id)
 );
 
+-- =====================================================
+-- MESSAGES TABLE
+-- =====================================================
 CREATE TABLE messages (
     id INT AUTO_INCREMENT PRIMARY KEY,
     sender_id INT NOT NULL,
@@ -151,17 +179,9 @@ CREATE TABLE messages (
     FOREIGN KEY (receiver_id) REFERENCES users(id)
 );
 
-CREATE TABLE notifications (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL,
-    title VARCHAR(150) NOT NULL,
-    message TEXT NOT NULL,
-    is_read TINYINT(1) DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
-
+-- =====================================================
+-- CONTACT MESSAGES TABLE
+-- =====================================================
 CREATE TABLE contact_messages (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
@@ -173,6 +193,9 @@ CREATE TABLE contact_messages (
     replied_at DATETIME NULL
 );
 
+-- =====================================================
+-- INSPECT TABLE
+-- =====================================================
 CREATE TABLE inspect (
     id INT AUTO_INCREMENT PRIMARY KEY,
     booking_id INT NOT NULL,
@@ -194,9 +217,7 @@ CREATE TABLE inspect (
 
 -- =====================================================
 -- LOCATION TRACKER TABLE
--- Stores GPS coordinates from renters for admin tracking
 -- =====================================================
-
 CREATE TABLE IF NOT EXISTS location_tracker (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
@@ -205,41 +226,7 @@ CREATE TABLE IF NOT EXISTS location_tracker (
     accuracy DECIMAL(10,2) DEFAULT 0,
     recorded_at DATETIME NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    
-    -- Indexes for faster queries
     INDEX idx_user_id (user_id),
     INDEX idx_recorded_at (recorded_at),
-    INDEX idx_user_recorded (user_id, recorded_at),
-    
-    -- Foreign key to users table
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    INDEX idx_user_recorded (user_id, recorded_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- =====================================================
--- OPTIONAL: View for easy location lookup
--- =====================================================
-
-CREATE VIEW vw_renter_locations AS
-SELECT 
-    lt.id,
-    lt.user_id,
-    lt.latitude,
-    lt.longitude,
-    lt.accuracy,
-    lt.recorded_at,
-    lt.created_at,
-    u.full_name,
-    u.email,
-    u.status AS account_status
-FROM location_tracker lt
-JOIN users u ON lt.user_id = u.id
-WHERE u.is_deleted = 0
-ORDER BY lt.recorded_at DESC;
-
-ALTER TABLE payments
-ADD COLUMN gateway_payment_id VARCHAR(255) NULL,
-ADD COLUMN payment_url TEXT NULL,
-ADD COLUMN gateway_status VARCHAR(50) NULL;
-
-ALTER TABLE payments
-MODIFY COLUMN payment_method ENUM('gcash','paymaya','cash','bank_transfer','xendit') NULL;

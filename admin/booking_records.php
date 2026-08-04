@@ -31,7 +31,6 @@ if ($ajax && ($_GET['section'] ?? '') === 'booking-history') {
   exit;
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -46,7 +45,7 @@ if ($ajax && ($_GET['section'] ?? '') === 'booking-history') {
   <div class="overlay"></div>
   
   <aside class="sidebar">
-<div class="sidebar-header">
+    <div class="sidebar-header">
       <h2>Carbnb Admin</h2>
       <button class="sidebar-close" type="button" aria-label="Close sidebar"></button>
     </div>
@@ -66,7 +65,7 @@ if ($ajax && ($_GET['section'] ?? '') === 'booking-history') {
   </aside>
 
   <div class="main-content">
-<header class="topbar">
+    <header class="topbar">
       <button class="sidebar-toggle" type="button" aria-label="Open sidebar"></button>
       <h1>Rental Records</h1>
     </header>
@@ -93,7 +92,7 @@ if ($ajax && ($_GET['section'] ?? '') === 'booking-history') {
 
       <section class="card">
         <h3 class="section-title">Booking History</h3>
-        <div class="table-wrapper only-desktop">
+        <div class="table-wrapper">
           <table class="table">
             <thead>
               <tr>
@@ -150,69 +149,6 @@ if ($ajax && ($_GET['section'] ?? '') === 'booking-history') {
             </tbody>
           </table>
         </div>
-
-        <!-- Mobile-only booking cards -->
-        <div class="booking-cards only-mobile">
-          <?php if (empty($records)): ?>
-            <p class="empty-state">No booking records found.</p>
-          <?php else: ?>
-            <?php foreach ($records as $record): ?>
-              <div class="booking-card">
-                <div class="booking-card-header">Booking #<?= $record['id'] ?></div>
-                <div class="booking-card-body">
-                  <div class="booking-card-row">
-                    <span class="label">Renter</span>
-                    <span class="value"><?= clean($record['renter_name']) ?></span>
-                  </div>
-                  <div class="booking-card-row">
-                    <span class="label">Owner</span>
-                    <span class="value"><?= clean($record['owner_name']) ?></span>
-                  </div>
-                  <div class="booking-card-row">
-                    <span class="label">Vehicle</span>
-                    <span class="value"><?= clean($record['vehicle_name']) ?></span>
-                  </div>
-                  <div class="booking-card-row">
-                    <span class="label">Pickup</span>
-                    <span class="value"><?= formatDate($record['start_date']) ?></span>
-                  </div>
-                  <div class="booking-card-row">
-                    <span class="label">Return</span>
-                    <span class="value"><?= formatDate($record['end_date']) ?></span>
-                  </div>
-                  <div class="booking-card-row">
-                    <span class="label">Amount</span>
-                    <span class="value">$<?= number_format($record['total_price'], 2) ?></span>
-                  </div>
-                  <div class="booking-card-row">
-                    <span class="label">Status</span>
-                    <span class="value">
-                      <span class="status-badge <?= statusBadgeClass($record['status']) ?>">
-                        <?= statusLabel($record['status']) ?>
-                      </span>
-                    </span>
-                  </div>
-                </div>
-                <div class="booking-card-actions">
-                  <?php if ($record['status'] === 'pending'): ?>
-                    <form method="POST" action="booking_records_logic.php">
-                      <input type="hidden" name="booking_id" value="<?= $record['id'] ?>">
-                      <input type="hidden" name="action" value="approve">
-                      <button type="submit" class="action-btn-small approve">Approve</button>
-                    </form>
-                    <button class="action-btn-small reject" onclick="showRejectModal(<?= $record['id'] ?>)">Disapprove</button>
-                  <?php elseif ($record['status'] === 'approved'): ?>
-                    <span class="text-success">Approved</span>
-                  <?php elseif ($record['status'] === 'disapproved'): ?>
-                    <span class="text-danger">Disapproved</span>
-                  <?php else: ?>
-                    <span class="text-muted">Completed</span>
-                  <?php endif; ?>
-                </div>
-              </div>
-            <?php endforeach; ?>
-          <?php endif; ?>
-        </div>
       </section>
     </main>
   </div>
@@ -232,7 +168,6 @@ if ($ajax && ($_GET['section'] ?? '') === 'booking-history') {
   </div>
 
   <script>
-    // Sidebar functionality
     document.addEventListener('DOMContentLoaded', function () {
       const sidebar = document.querySelector('.sidebar');
       const overlay = document.querySelector('.overlay');
@@ -278,7 +213,6 @@ if ($ajax && ($_GET['section'] ?? '') === 'booking-history') {
       });
     });
 
-    // Live refresh with improved error handling
     (function () {
       const liveTargets = document.querySelectorAll('[data-live-refresh]');
       let refreshIntervals = [];
@@ -311,15 +245,11 @@ if ($ajax && ($_GET['section'] ?? '') === 'booking-history') {
             });
         }
 
-        // Initial refresh
         refreshSection();
-
-        // Set interval with cleanup
         const intervalId = setInterval(refreshSection, 8000);
         refreshIntervals.push(intervalId);
       });
 
-      // Cleanup on page unload
       window.addEventListener('beforeunload', function() {
         refreshIntervals.forEach(function(id) {
           clearInterval(id);
@@ -327,7 +257,6 @@ if ($ajax && ($_GET['section'] ?? '') === 'booking-history') {
       });
     })();
 
-    // Reject modal functions
     function showRejectModal(bookingId) {
       document.getElementById('rejectBookingId').value = bookingId;
       document.getElementById('rejectModal').style.display = 'flex';

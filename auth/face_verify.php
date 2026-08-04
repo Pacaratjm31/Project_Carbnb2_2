@@ -1,6 +1,5 @@
 <?php
 session_start();
-
 require_once __DIR__ . '/../database/db.php';
 
 function computeDescriptorDistance(array $left, array $right): float
@@ -43,7 +42,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmt = $pdo->prepare("
         SELECT
             face_descriptor,
-            face_verified
+            face_verified,
+            status,
+            role
         FROM users
         WHERE id = ?
         AND is_deleted = 0
@@ -52,14 +53,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmt->execute([$userId]);
     $user = $stmt->fetch();
 
-if (!$user || empty($user['face_descriptor'])) {
-    http_response_code(403);
-    echo json_encode([
-        'success' => false,
-        'message' => 'Face registration not found.'
-    ]);
-    exit();
-}
+    if (!$user) {
+        http_response_code(403);
+        echo json_encode([
+            'success' => false,
+            'message' => 'User not found.'
+        ]);
+        exit();
+    }
+
+    if (empty($user['face_descriptor'])) {
+        http_response_code(403);
+        echo json_encode([
+            'success' => false,
+            'message' => 'Face registration not found.'
+        ]);
+        exit();
+    }
 
     if (($user['status'] ?? '') === 'disapproved') {
         http_response_code(403);
@@ -96,7 +106,7 @@ if (!$user || empty($user['face_descriptor'])) {
     $distance = computeDescriptorDistance($liveDescriptor, $registeredDescriptor);
     $threshold = 0.55;
 
-if ($distance <= $threshold) {
+    if ($distance <= $threshold) {
         $_SESSION['face_verified'] = true;
         $_SESSION['face_verified_at'] = time();
 
@@ -108,10 +118,16 @@ if ($distance <= $threshold) {
         ");
         $update->execute([$userId]);
 
-echo json_encode([
+        // Determine redirect based on role
+        $redirect = '../renter/browse.php';
+        if (($user['role'] ?? '') === 'owner') {
+            $redirect = '../owner/owner_dashboard.php';
+        }
+
+        echo json_encode([
             'success' => true,
             'distance' => round($distance, 4),
-            'redirect' => '../renter/browse.php'
+            'redirect' => $redirect
         ]);
     } else {
         http_response_code(401);
@@ -132,7 +148,6 @@ echo json_encode([
 */
 
 if (!isset($_SESSION['user_id'])) {
-
     header("Location: login.php");
     exit();
 }
@@ -161,7 +176,6 @@ $stmt = $pdo->prepare("
 ");
 
 $stmt->execute([$userId]);
-
 $user = $stmt->fetch();
 
 /*
@@ -171,9 +185,7 @@ $user = $stmt->fetch();
 */
 
 if (!$user) {
-
     session_destroy();
-
     header("Location: login.php");
     exit();
 }
@@ -185,9 +197,7 @@ if (!$user) {
 */
 
 if ($user['status'] === 'disapproved') {
-
     session_destroy();
-
     die("Your account has been disapproved.");
 }
 
@@ -198,7 +208,6 @@ if ($user['status'] === 'disapproved') {
 */
 
 if ($user['role'] === 'owner') {
-
     header("Location: ../owner/owner_dashboard.php");
     exit();
 }
@@ -210,9 +219,7 @@ if ($user['role'] === 'owner') {
 */
 
 if ($user['role'] !== 'renter') {
-
     session_destroy();
-
     header("Location: login.php");
     exit();
 }
@@ -223,11 +230,7 @@ if ($user['role'] !== 'renter') {
 |--------------------------------------------------------------------------
 */
 
-if (
-    empty($user['face_image']) ||
-    empty($user['face_descriptor'])
-) {
-
+if (empty($user['face_image']) || empty($user['face_descriptor'])) {
     die(
         "Face registration not found. Please register your face first."
     );
@@ -241,13 +244,8 @@ if (
 |--------------------------------------------------------------------------
 */
 
-if (
-    $user['status'] !== 'pending' &&
-    $user['status'] !== 'approved'
-) {
-
+if ($user['status'] !== 'pending' && $user['status'] !== 'approved') {
     session_destroy();
-
     header("Location: login.php");
     exit();
 }
@@ -258,32 +256,17 @@ if (
 |--------------------------------------------------------------------------
 */
 
-$registeredFaceImage =
-    "../" . $user['face_image'];
-$registeredFaceDescriptor =
-    json_decode($user['face_descriptor'], true);
+$registeredFaceImage = "../" . $user['face_image'];
+$registeredFaceDescriptor = json_decode($user['face_descriptor'], true);
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-
     <meta charset="UTF-8">
-
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Face Verification</title>
-    <link
-    rel="stylesheet"
-    href="face_verify_style.css?v=1.1"
-    >
-
+    <link rel="stylesheet" href="face_verify_style.css?v=1.1">
 </head>
-
 <body>
 
 <div class="face-container">
@@ -292,7 +275,13 @@ $registeredFaceDescriptor =
 
     <?php if ($user['status'] === 'pending'): ?>
         <div class="status-message" style="background-color: #fff3cd; color: #856404; padding: 10px; border-radius: 5px; margin-bottom: 15px;">
-            Your account is pending admin approval. Limited access until verified.
+            ⚠️ Your account is pending admin approval. Limited access until verified.
+        </div>
+    <?php endif; ?>
+
+    <?php if ($user['face_verified'] == 1): ?>
+        <div class="success-message" style="background-color: #d4edda; color: #155724; padding: 10px; border-radius: 5px; margin-bottom: 15px;">
+            ✅ Your face is already verified. You can proceed.
         </div>
     <?php endif; ?>
 
@@ -301,37 +290,21 @@ $registeredFaceDescriptor =
     </p>
 
     <div class="camera-wrapper">
-
-        <video
-            id="video"
-            autoplay
-            muted
-            playsinline
-        ></video>
-
+        <video id="video" autoplay muted playsinline></video>
         <canvas id="canvas"></canvas>
-
     </div>
 
-    <div
-        id="statusMessage"
-        class="status-message"
-    >
+    <div id="statusMessage" class="status-message">
         Loading face verification...
     </div>
 
-    <button
-        id="verifyBtn"
-        type="button"
-        disabled
-    >
+    <button id="verifyBtn" type="button" disabled>
         Verify Face
     </button>
 
 </div>
 
 <script src="../face-api.js-master/dist/face-api.min.js"></script>
-
 <script src="script_verify.js"></script>
 
 <script>
@@ -340,28 +313,13 @@ window.registeredFaceImage = <?php echo json_encode($registeredFaceImage); ?>;
 </script>
 
 <script>
+document.addEventListener("DOMContentLoaded", () => {
+    const statusMessage = document.getElementById("statusMessage");
+    const verifyBtn = document.getElementById("verifyBtn");
 
-document.addEventListener(
-    "DOMContentLoaded",
-    () => {
-
-        const statusMessage =
-            document.getElementById(
-                "statusMessage"
-            );
-
-        const verifyBtn =
-            document.getElementById(
-                "verifyBtn"
-            );
-
-        verifyBtn.disabled = true;
-
-        statusMessage.textContent =
-            "Initializing face verification...";
-    }
-);
-
+    verifyBtn.disabled = true;
+    statusMessage.textContent = "Initializing face verification...";
+});
 </script>
 
 </body>

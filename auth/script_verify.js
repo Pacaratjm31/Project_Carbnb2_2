@@ -7,6 +7,7 @@ const registeredFaceDescriptor = window.registeredFaceDescriptor || [];
 const registeredFaceImage = window.registeredFaceImage || "";
 
 let faceDetected = false;
+let isVerifying = false;
 
 if (!registeredFaceDescriptor.length) {
     statusMessage.textContent = "No registered face template found.";
@@ -71,6 +72,9 @@ video.addEventListener("playing", () => {
 });
 
 verifyBtn.addEventListener("click", async () => {
+    if (isVerifying) return;
+    isVerifying = true;
+
     verifyBtn.disabled = true;
     statusMessage.textContent = "Verifying face...";
 
@@ -86,12 +90,14 @@ verifyBtn.addEventListener("click", async () => {
         if (!detection) {
             statusMessage.textContent = "No face detected.";
             verifyBtn.disabled = false;
+            isVerifying = false;
             return;
         }
 
         if (!registeredFaceDescriptor.length) {
             statusMessage.textContent = "No registered face template available.";
             verifyBtn.disabled = false;
+            isVerifying = false;
             return;
         }
 
@@ -107,8 +113,8 @@ verifyBtn.addEventListener("click", async () => {
 
         const result = await response.json();
 
-if (result.success) {
-            statusMessage.textContent = "Face verified successfully.";
+        if (result.success) {
+            statusMessage.textContent = "✅ Face verified successfully! Redirecting...";
             const redirectUrl = result.redirect || "../renter/browse.php";
             setTimeout(() => {
                 window.location.href = redirectUrl;
@@ -116,11 +122,13 @@ if (result.success) {
         } else {
             statusMessage.textContent = result.message || "Face does not match the registered profile.";
             verifyBtn.disabled = false;
+            isVerifying = false;
         }
     } catch (error) {
         console.error(error);
         statusMessage.textContent = "Verification error.";
         verifyBtn.disabled = false;
+        isVerifying = false;
     }
 });
 });

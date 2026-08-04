@@ -25,21 +25,50 @@ table {
   max-width: 100%;
 }
 
-/* Booking records page ships two markups (desktop table +
-   mobile card list). Default: mobile cards hidden, desktop
-   table shows, at every width until the mobile breakpoint
-   below flips them. Fixes both being visible at once. */
+/* =======================================================
+   VIEW CONTROLS - DESKTOP/MOBILE SWITCH
+   ======================================================= */
+.only-desktop {
+  display: block !important;
+}
+
 .only-mobile {
-  display: none;
+  display: none !important;
+}
+
+/* Force desktop table to show, mobile cards to hide on desktop */
+@media (min-width: 993px) {
+  .only-desktop {
+    display: block !important;
+  }
+  .only-mobile {
+    display: none !important;
+  }
+  .booking-cards {
+    display: none !important;
+  }
+}
+
+/* Force mobile cards to show, desktop table to hide on mobile */
+@media (max-width: 992px) {
+  .only-desktop {
+    display: none !important;
+  }
+  .only-mobile {
+    display: block !important;
+  }
+  .booking-cards {
+    display: flex !important;
+    flex-direction: column;
+    gap: 12px;
+  }
 }
 
 /* =======================================================
    TABLET — 992px and below
    ======================================================= */
 @media (max-width: 992px) {
-  /* Off-canvas sidebar drawer. Base .sidebar rule in
-     admin_style.css already sets position/width/etc — this
-     only adds the collapsed/open transform states. */
+  /* Off-canvas sidebar drawer */
   .sidebar {
     transform: translateX(-100%);
   }
@@ -60,7 +89,7 @@ table {
   }
 
   .sidebar-toggle {
-    display: inline-flex;
+    display: inline-flex !important;
   }
 
   body.sidebar-open,
@@ -97,11 +126,26 @@ table {
     gap: 16px;
   }
 
-  /* earnings.php summary grid uses an inline
-     grid-template-columns style, which outranks a plain
-     class rule — !important is required to collapse it. */
+  /* earnings.php summary grid */
   #admin-earnings-summary {
     grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* ===================================================
+     SWITCH: Show mobile cards, hide desktop tables
+     =================================================== */
+  .only-desktop {
+    display: none !important;
+  }
+
+  .only-mobile {
+    display: block !important;
+  }
+
+  .booking-cards {
+    display: flex !important;
+    flex-direction: column;
+    gap: 12px;
   }
 }
 
@@ -191,11 +235,7 @@ table {
     justify-content: center;
   }
 
-  /* ---- Tables -> stacked cards, bold title row -----------
-     Every <td> already carries data-label, so this is a
-     pure-CSS conversion. Scoped with :not(.info-table) so
-     the nested vehicle detail table (below) isn't affected —
-     it needs a different treatment. */
+  /* ---- Tables -> stacked cards, bold title row ----------- */
   .table-wrapper {
     overflow-x: visible;
     border-radius: 14px;
@@ -244,8 +284,7 @@ table {
     flex-shrink: 0;
   }
 
-  /* First cell in every row becomes the bold card title —
-     no data-label prefix, larger text, own divider line. */
+  /* First cell in every row becomes the bold card title */
   table.table:not(.info-table) td:first-child {
     display: block;
     text-align: left;
@@ -305,11 +344,7 @@ table {
     text-align: center;
   }
 
-  /* ---- Nested vehicle info-table --------------------------
-     Label above value (not a flex row) since it's already
-     inside a vehicle-card, not a full-width data table.
-     width:auto overrides the desktop fixed th width, which
-     would otherwise misalign the stacked block layout. */
+  /* ---- Nested vehicle info-table -------------------------- */
   table.info-table,
   table.info-table tbody,
   table.info-table tr,
@@ -339,8 +374,7 @@ table {
     color: var(--muted);
   }
 
-  /* ---- Vehicle cards (verify_vehicles.php) ----------------
-     Image on top, details below, actions stacked full width. */
+  /* ---- Vehicle cards (verify_vehicles.php) ---------------- */
   .vehicle-card {
     display: flex;
     flex-direction: column;
@@ -384,29 +418,13 @@ table {
     min-height: 44px;
   }
 
-  /* ---- Booking records: desktop table vs mobile cards -----
-     .only-desktop/.only-mobile/.booking-card* had no CSS
-     anywhere before this file — both markups rendered at
-     once on every screen size. This is the fix. */
-  .only-desktop {
-    display: none;
-  }
-
-  .only-mobile {
-    display: block;
-  }
-
-  .booking-cards {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-
+  /* ---- Booking records: desktop table vs mobile cards ----- */
   .booking-card {
     background: var(--panel-2);
     border: 1px solid var(--border);
     border-radius: 14px;
-    padding: 14px;
+    padding: 16px;
+    margin-bottom: 0;
   }
 
   .booking-card-header {
@@ -429,13 +447,12 @@ table {
     justify-content: space-between;
     gap: 12px;
     font-size: 0.86rem;
-    padding-bottom: 8px;
-    border-bottom: 1px solid var(--border);
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   }
 
   .booking-card-row:last-child {
     border-bottom: none;
-    padding-bottom: 0;
   }
 
   .booking-card-row .label {
@@ -445,6 +462,7 @@ table {
 
   .booking-card-row .value {
     text-align: right;
+    font-weight: 500;
   }
 
   .booking-card-actions {
@@ -452,13 +470,29 @@ table {
     flex-direction: column;
     gap: 8px;
     margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
   }
 
   .booking-card-actions form,
-  .booking-card-actions button,
+  .booking-card-actions button {
+    width: 100%;
+  }
+
   .booking-card-actions .action-btn-small {
     width: 100%;
     min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .booking-card .status-badge {
+    display: inline-block;
+    padding: 5px 10px;
+    border-radius: 999px;
+    font-size: 0.84rem;
+    font-weight: 700;
   }
 
   /* ---- Document verification modal (manage_users.php) ----- */
@@ -708,5 +742,22 @@ table {
   .btn-primary {
     font-size: 0.85rem;
     padding: 9px 12px;
+  }
+}
+
+/* =======================================================
+   DESKTOP OVERRIDE — Ensure mobile cards never show on desktop
+   ======================================================= */
+@media (min-width: 993px) {
+  .only-mobile {
+    display: none !important;
+  }
+
+  .only-desktop {
+    display: block !important;
+  }
+
+  .booking-cards {
+    display: none !important;
   }
 }

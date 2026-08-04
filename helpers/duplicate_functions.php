@@ -140,7 +140,7 @@ function validate_form_token_or_error(string $formName): ?string
     return null;
 }
 
-// Return a car - mark booking as completed and send notification to owner
+// Return a car - mark booking as return_requested and notify owner
 function return_car(PDO $pdo, int $renter_id, int $booking_id): array
 {
     if ($renter_id <= 0 || $booking_id <= 0) {
@@ -148,9 +148,6 @@ function return_car(PDO $pdo, int $renter_id, int $booking_id): array
     }
 
     // Verify the booking belongs to this renter and is approved
-    // NOTE: owner_id lives on the `vehicles` table (v.owner_id), not on
-    // `bookings` — the previous version incorrectly selected b.owner_id,
-    // which caused a "Column not found" fatal error on return.
     $stmt = $pdo->prepare("SELECT b.id, b.vehicle_id, b.status, v.owner_id, v.name AS vehicle_name, u.full_name AS renter_name 
                            FROM bookings b 
                            JOIN vehicles v ON v.id = b.vehicle_id 
@@ -174,17 +171,15 @@ function return_car(PDO $pdo, int $renter_id, int $booking_id): array
         $stmt = $pdo->prepare("UPDATE bookings SET status = 'return_requested' WHERE id = ?");
         $stmt->execute([$booking_id]);
 
-        // Send notification to owner
-        $stmt = $pdo->prepare("INSERT INTO messages (sender_id, receiver_id, message) VALUES (?, ?, ?)");
-        $stmt->execute([
-            $renter_id, 
-            $booking['owner_id'], 
-            "Renter '{$booking['renter_name']}' has returned the vehicle '{$booking['vehicle_name']}'. Please mark it as available in your Manage Vehicles page."
-        ]);
+        // ============================================
+        // REMOVED: Auto-message to owner
+        // The owner can see the return request in booking_requests.php
+        // This was removed because it was causing duplicate/annoying messages
+        // ============================================
 
         $pdo->commit();
 
-        return ['success' => true, 'message' => 'Return request sent! The owner has been notified. They will mark the vehicle as available soon.'];
+        return ['success' => true, 'message' => 'Return request sent! The owner has been notified.'];
     } catch (PDOException $e) {
         $pdo->rollBack();
         return ['success' => false, 'message' => 'Error sending return request. Please try again.'];
