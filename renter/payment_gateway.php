@@ -95,7 +95,7 @@ if (!$booking) {
 // XENDIT SECRET KEY
 // =============================
 
-$secret_key = "";
+$secret_key = "YOUR_API_KEY_HERE";
 
 
 
