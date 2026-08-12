@@ -56,18 +56,52 @@ nav h2 {
     color: #ff8c00;
 }
 
+.nav-links {
+    display: flex;
+    align-items: center;
+    gap: 25px;
+}
+
 .nav-links a {
     color: #cfcfcf;
     text-decoration: none;
-    margin-left: 25px;
     font-weight: bold;
+    transition: color 0.3s ease;
 }
 
-.nav-links a:hover { color: #00bfff; }
+.nav-links a:hover { 
+    color: #00bfff; 
+}
+
+/* ✅ NEW: Navbar Download Button */
+.nav-download-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #ff8c00;
+    color: #1a1a1a !important;
+    padding: 8px 18px;
+    border-radius: 50px;
+    font-weight: 700;
+    font-size: 0.9rem;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    border: 2px solid #ff8c00;
+}
+
+.nav-download-btn:hover {
+    background: #e07b00 !important;
+    transform: scale(1.05);
+    color: #1a1a1a !important;
+}
+
+.nav-download-btn:active {
+    transform: scale(0.95);
+}
 
 /* TITLE SECTION (ABOVE IMAGE) */
 .header-text {
-    margin-top: 100px; /* reduced from 110px */
+    margin-top: 100px;
     text-align: center;
 }
 
@@ -82,7 +116,7 @@ nav h2 {
 .header-text p {
     font-size: 1.3rem;
     color: #dcdcdc;
-    margin-top: 8px; /* reduced spacing */
+    margin-top: 8px;
 }
 
 /* HERO BANNER */
@@ -127,6 +161,7 @@ nav h2 {
     font-size: 1.2rem;
     line-height: 1.6;
     color: #e2e8f0;
+    margin-bottom: 0;
 }
 
 .showcase {
@@ -169,7 +204,7 @@ nav h2 {
 /* INTRODUCTION */
 .introduction {
     text-align: center;
-    padding: 30px 20px; /* reduced from 50px */
+    padding: 30px 20px;
 }
 
 .introduction h2 {
@@ -189,7 +224,7 @@ footer {
     color: #ffd700;
     text-align: center;
     padding: 20px;
-    margin-top: 20px; /* reduced */
+    margin-top: 20px;
 }
 
 /* MOBILE ADJUSTMENTS */
@@ -199,7 +234,22 @@ footer {
         height: 64px;
     }
 
-    .nav-links a { margin-left: 12px; font-size: 14px; }
+    .nav-links {
+        gap: 12px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
+
+    .nav-links a {
+        font-size: 13px;
+    }
+
+    /* ✅ Mobile navbar button adjustment */
+    .nav-download-btn {
+        padding: 6px 14px;
+        font-size: 0.8rem;
+        gap: 4px;
+    }
 
     .header-text {
         margin-top: 90px;
@@ -253,10 +303,19 @@ footer {
     }
 
     .nav-links {
-        display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-        justify-content: center;
+        gap: 8px;
+    }
+
+    .nav-links a {
+        font-size: 11px;
+    }
+
+    /* ✅ Mobile navbar button adjustment */
+    .nav-download-btn {
+        padding: 5px 12px;
+        font-size: 0.7rem;
+        gap: 3px;
+        border-width: 1.5px;
     }
 
     .header-text {
@@ -310,6 +369,8 @@ footer {
         <a href="contact.php">Contact</a>
         <a href="auth/login.php">Login</a>
         <a href="auth/register.php">Register</a>
+        <!-- ✅ NEW: Navbar Download Button -->
+        <a href="carbnb_install.php" class="nav-download-btn">📱 Download App</a>
     </div>
 </nav>
 
@@ -321,11 +382,12 @@ footer {
     <p>A Self-Drive Rental Platform for Private Vehicle Owners</p>
 </section>
 
-<!-- IMAGE -->
+<!-- HERO BANNER -->
 <section class="hero" id="hero">
     <div class="hero-content">
         <h2>Drive Luxury. Rent Easily.</h2>
         <p>Discover premium vehicles from trusted owners with effortless self-drive booking.</p>
+        <!-- ❌ REMOVED: Large download button from hero section -->
     </div>
 </section>
 
