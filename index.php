@@ -1,466 +1,913 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Carbnb</title>
 
-<link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#0d6efd">
-<script src="/pwa.js" defer></script>
+    <meta charset="UTF-8">
 
-<style>
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-    font-family: 'Segoe UI', Arial, sans-serif;
-}
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
-body {
-   background:#1e1e1e;
-    color: #cfcfcf;
-}
+    <meta
+        name="theme-color"
+        content="#0d6efd"
+    >
 
-/* NAVBAR */
-nav {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background-color: #2a2a2a;
-    padding: 0 50px;
-    height: 80px;
-    position: fixed;
-    top: 0;
-    width: 100%;
-    z-index: 1000;
-}
+    <title>Carbnb</title>
 
-nav h2 {
-    color: #ffffff;
-    font-size: 28px;
-}
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.json">
 
-.brand-logo {
-    font-size: 28px;
-    font-weight: 700;
-}
+    <script src="/pwa.js" defer></script>
 
-.brand-logo .blue,
-.header-text .blue {
-    color: #00bfff;
-}
+    <style>
 
-.brand-logo .orange,
-.header-text .orange {
-    color: #ff8c00;
-}
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Arial, sans-serif;
+        }
 
-.nav-links {
-    display: flex;
-    align-items: center;
-    gap: 25px;
-}
+        html {
+            scroll-behavior: smooth;
+        }
 
-.nav-links a {
-    color: #cfcfcf;
-    text-decoration: none;
-    font-weight: bold;
-    transition: color 0.3s ease;
-}
+        body {
+            background: #1e1e1e;
+            color: #cfcfcf;
+            min-height: 100vh;
+        }
 
-.nav-links a:hover { 
-    color: #00bfff; 
-}
+        /* =====================================================
+           NAVBAR
+        ===================================================== */
 
-/* ✅ NEW: Navbar Download Button */
-.nav-download-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: #ff8c00;
-    color: #1a1a1a !important;
-    padding: 8px 18px;
-    border-radius: 50px;
-    font-weight: 700;
-    font-size: 0.9rem;
-    text-decoration: none;
-    transition: all 0.3s ease;
-    border: 2px solid #ff8c00;
-}
+        nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
 
-.nav-download-btn:hover {
-    background: #e07b00 !important;
-    transform: scale(1.05);
-    color: #1a1a1a !important;
-}
+            background-color: #2a2a2a;
 
-.nav-download-btn:active {
-    transform: scale(0.95);
-}
+            padding: 0 50px;
 
-/* TITLE SECTION (ABOVE IMAGE) */
-.header-text {
-    margin-top: 100px;
-    text-align: center;
-}
+            height: 80px;
 
-.header-text h1 {
-    font-size: 4rem;
-    font-weight: bold;
-}
+            position: fixed;
+            top: 0;
+            left: 0;
 
-.header-text .blue { color: #00bfff; }
-.header-text .orange { color: #ff8c00; }
+            width: 100%;
 
-.header-text p {
-    font-size: 1.3rem;
-    color: #dcdcdc;
-    margin-top: 8px;
-}
+            z-index: 1000;
 
-/* HERO BANNER */
-.hero {
-    position: relative;
-    height: 60vh;
-    margin-top: 20px;
-    border-radius: 24px;
-    overflow: hidden;
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
-    background-color: #0b233a;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #ffffff;
-    transition: background-image 1s ease-in-out;
-}
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+        }
 
-.hero::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(180deg, rgba(11,40,66,0.38) 0%, rgba(11,40,66,0.72) 100%);
-}
+        nav h2 {
+            color: #ffffff;
+            font-size: 28px;
+        }
 
-.hero-content {
-    position: relative;
-    z-index: 2;
-    text-align: center;
-    padding: 0 24px;
-    max-width: 920px;
-}
+        .brand-logo {
+            font-size: 28px;
+            font-weight: 700;
+        }
 
-.hero-content h2 {
-    font-size: 3rem;
-    margin-bottom: 14px;
-}
+        .brand-logo .blue,
+        .header-text .blue {
+            color: #00bfff;
+        }
 
-.hero-content p {
-    font-size: 1.2rem;
-    line-height: 1.6;
-    color: #e2e8f0;
-    margin-bottom: 0;
-}
+        .brand-logo .orange,
+        .header-text .orange {
+            color: #ff8c00;
+        }
 
-.showcase {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(220px, 1fr));
-    gap: 20px;
-    padding: 40px 20px;
-    max-width: 1200px;
-    margin: auto;
-}
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 25px;
+        }
 
-.showcase-card {
-    background: #1f2937;
-    border-radius: 18px;
-    overflow: hidden;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
-}
+        .nav-links a {
+            color: #cfcfcf;
+            text-decoration: none;
+            font-weight: bold;
 
-.showcase-card img {
-    width: 100%;
-    display: block;
-    object-fit: cover;
-    height: 220px;
-}
+            transition:
+                color 0.3s ease,
+                transform 0.2s ease;
+        }
 
-.showcase-card-content {
-    padding: 20px;
-}
+        .nav-links a:hover {
+            color: #00bfff;
+        }
 
-.showcase-card h3 {
-    color: #ffd700;
-    margin-bottom: 10px;
-}
+        /* =====================================================
+           DOWNLOAD APP BUTTON
+        ===================================================== */
 
-.showcase-card p {
-    color: #d1d5db;
-    line-height: 1.7;
-}
+        .nav-download-btn {
+            display: inline-flex;
 
-/* INTRODUCTION */
-.introduction {
-    text-align: center;
-    padding: 30px 20px;
-}
+            align-items: center;
+            justify-content: center;
 
-.introduction h2 {
-    color: #ffd700;
-    margin-bottom: 10px;
-}
+            gap: 6px;
 
-.introduction p {
-    max-width: 900px;
-    margin: auto;
-    line-height: 1.8;
-}
+            background: #ff8c00;
 
-/* FOOTER */
-footer {
-    background-color: #2a2a2a;
-    color: #ffd700;
-    text-align: center;
-    padding: 20px;
-    margin-top: 20px;
-}
+            color: #1a1a1a !important;
 
-/* MOBILE ADJUSTMENTS */
-@media (max-width: 768px) {
-    nav {
-        padding: 0 16px;
-        height: 64px;
-    }
+            padding: 8px 18px;
 
-    .nav-links {
-        gap: 12px;
-        flex-wrap: wrap;
-        justify-content: flex-end;
-    }
+            border-radius: 50px;
 
-    .nav-links a {
-        font-size: 13px;
-    }
+            font-weight: 700;
 
-    /* ✅ Mobile navbar button adjustment */
-    .nav-download-btn {
-        padding: 6px 14px;
-        font-size: 0.8rem;
-        gap: 4px;
-    }
+            font-size: 0.9rem;
 
-    .header-text {
-        margin-top: 90px;
-    }
+            text-decoration: none;
 
-    .header-text h1 { font-size: 2.2rem; }
-    .header-text p { font-size: 1rem; }
+            transition: all 0.3s ease;
 
-    .hero-carousel {
-        height: 45vh;
-    }
+            border: 2px solid #ff8c00;
+        }
 
-    .hero-content h2 {
-        font-size: 2rem;
-    }
+        .nav-download-btn:hover {
+            background: #e07b00 !important;
 
-    .hero-content p {
-        font-size: 1rem;
-    }
+            transform: scale(1.05);
 
-    .carousel-controls {
-        width: calc(100% - 32px);
-    }
+            color: #1a1a1a !important;
+        }
 
-    .carousel-button {
-        width: 38px;
-        height: 38px;
-    }
+        .nav-download-btn:active {
+            transform: scale(0.95);
+        }
 
-    .carousel-indicators {
-        bottom: 16px;
-    }
+        /* =====================================================
+           TITLE SECTION
+        ===================================================== */
 
-    .showcase {
-        grid-template-columns: repeat(2, minmax(180px, 1fr));
-        gap: 16px;
-        padding: 30px 16px;
-    }
+        .header-text {
+            margin-top: 100px;
 
-    .showcase-card img {
-        height: 200px;
-    }
+            text-align: center;
 
-    .introduction p { padding: 10px; }
-}
+            padding: 0 20px;
+        }
 
-@media (max-width: 576px) {
-    nav {
-        padding: 0 12px;
-        height: 58px;
-    }
+        .header-text h1 {
+            font-size: 4rem;
 
-    .nav-links {
-        gap: 8px;
-    }
+            font-weight: bold;
 
-    .nav-links a {
-        font-size: 11px;
-    }
+            margin-bottom: 8px;
+        }
 
-    /* ✅ Mobile navbar button adjustment */
-    .nav-download-btn {
-        padding: 5px 12px;
-        font-size: 0.7rem;
-        gap: 3px;
-        border-width: 1.5px;
-    }
+        .header-text .blue {
+            color: #00bfff;
+        }
 
-    .header-text {
-        margin-top: 80px;
-    }
+        .header-text .orange {
+            color: #ff8c00;
+        }
 
-    .header-text h1 { font-size: 1.8rem; }
-    .header-text p { font-size: 0.95rem; }
+        .header-text p {
+            font-size: 1.3rem;
 
-    .hero-carousel {
-        height: 35vh;
-    }
+            color: #dcdcdc;
 
-    .hero-content h2 {
-        font-size: 1.6rem;
-    }
+            margin-top: 8px;
 
-    .hero-content p {
-        font-size: 0.95rem;
-    }
+            line-height: 1.6;
+        }
 
-    .carousel-button {
-        width: 34px;
-        height: 34px;
-    }
+        /* =====================================================
+           HERO SECTION
+        ===================================================== */
 
-    .carousel-indicator {
-        width: 10px;
-        height: 10px;
-    }
+        .hero {
+            position: relative;
 
-    .showcase {
-        grid-template-columns: 1fr;
-        padding: 24px 12px;
-    }
+            height: 60vh;
 
-    .showcase-card img {
-        height: 180px;
-    }
-}
-</style>
+            min-height: 400px;
+
+            margin: 20px 20px 0;
+
+            border-radius: 24px;
+
+            overflow: hidden;
+
+            background-size: cover;
+
+            background-position: center;
+
+            background-repeat: no-repeat;
+
+            background-color: #0b233a;
+
+            display: flex;
+
+            align-items: center;
+
+            justify-content: center;
+
+            color: #ffffff;
+
+            opacity: 1;
+
+            transition: opacity 0.7s ease-in-out;
+
+            box-shadow:
+                0 10px 40px rgba(0, 0, 0, 0.30);
+        }
+
+        .hero::before {
+            content: '';
+
+            position: absolute;
+
+            inset: 0;
+
+            background:
+                linear-gradient(
+                    180deg,
+                    rgba(11, 40, 66, 0.38) 0%,
+                    rgba(11, 40, 66, 0.72) 100%
+                );
+
+            z-index: 1;
+
+            pointer-events: none;
+        }
+
+        .hero-content {
+            position: relative;
+
+            z-index: 2;
+
+            text-align: center;
+
+            padding: 0 24px;
+
+            max-width: 920px;
+        }
+
+        .hero-content h2 {
+            font-size: 3rem;
+
+            margin-bottom: 14px;
+
+            color: #ffffff;
+
+            text-shadow:
+                0 3px 12px rgba(0, 0, 0, 0.55);
+        }
+
+        .hero-content p {
+            font-size: 1.2rem;
+
+            line-height: 1.6;
+
+            color: #e2e8f0;
+
+            margin-bottom: 0;
+
+            text-shadow:
+                0 2px 8px rgba(0, 0, 0, 0.55);
+        }
+
+        /* =====================================================
+           ORIGINAL SHOWCASE CARDS
+        ===================================================== */
+
+        .showcase {
+            display: grid;
+
+            grid-template-columns:
+                repeat(3, minmax(220px, 1fr));
+
+            gap: 20px;
+
+            padding: 40px 20px;
+
+            max-width: 1200px;
+
+            margin: auto;
+        }
+
+        .showcase-card {
+            background: #1f2937;
+
+            border-radius: 18px;
+
+            overflow: hidden;
+
+            box-shadow:
+                0 8px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .showcase-card img {
+            width: 100%;
+
+            display: block;
+
+            object-fit: cover;
+
+            height: 220px;
+        }
+
+        .showcase-card-content {
+            padding: 20px;
+        }
+
+        .showcase-card h3 {
+            color: #ffd700;
+
+            margin-bottom: 10px;
+        }
+
+        .showcase-card p {
+            color: #d1d5db;
+
+            line-height: 1.7;
+        }
+
+        /* =====================================================
+           INTRODUCTION
+        ===================================================== */
+
+        .introduction {
+            text-align: center;
+
+            padding: 30px 20px 40px;
+
+            max-width: 1000px;
+
+            margin: 0 auto;
+        }
+
+        .introduction h2 {
+            color: #ffd700;
+
+            margin-bottom: 15px;
+
+            font-size: 2rem;
+        }
+
+        .introduction p {
+            max-width: 900px;
+
+            margin: auto;
+
+            line-height: 1.8;
+
+            color: #cfcfcf;
+
+            font-size: 1rem;
+        }
+
+        /* =====================================================
+           FOOTER
+        ===================================================== */
+
+        footer {
+            background-color: #2a2a2a;
+
+            color: #ffd700;
+
+            text-align: center;
+
+            padding: 20px;
+
+            margin-top: 20px;
+        }
+
+        /* =====================================================
+           TABLET
+        ===================================================== */
+
+        @media (max-width: 900px) {
+
+            nav {
+                padding: 0 25px;
+            }
+
+            .nav-links {
+                gap: 15px;
+            }
+
+            .nav-links a {
+                font-size: 14px;
+            }
+
+            .header-text h1 {
+                font-size: 3rem;
+            }
+
+            .hero {
+                height: 50vh;
+            }
+
+            .hero-content h2 {
+                font-size: 2.5rem;
+            }
+
+            .showcase {
+                grid-template-columns:
+                    repeat(2, minmax(180px, 1fr));
+            }
+
+        }
+
+        /* =====================================================
+           MOBILE
+        ===================================================== */
+
+        @media (max-width: 768px) {
+
+            nav {
+                padding: 0 16px;
+
+                height: 64px;
+            }
+
+            .brand-logo {
+                font-size: 23px;
+            }
+
+            .nav-links {
+                gap: 10px;
+
+                flex-wrap: wrap;
+
+                justify-content: flex-end;
+            }
+
+            .nav-links a {
+                font-size: 12px;
+            }
+
+            .nav-download-btn {
+                padding: 6px 12px;
+
+                font-size: 0.75rem;
+
+                gap: 4px;
+            }
+
+            .header-text {
+                margin-top: 85px;
+
+                padding: 0 15px;
+            }
+
+            .header-text h1 {
+                font-size: 2.4rem;
+            }
+
+            .header-text p {
+                font-size: 1rem;
+            }
+
+            .hero {
+                height: 45vh;
+
+                min-height: 330px;
+
+                margin: 20px 12px 0;
+
+                border-radius: 18px;
+            }
+
+            .hero-content {
+                padding: 0 20px;
+            }
+
+            .hero-content h2 {
+                font-size: 2rem;
+
+                line-height: 1.25;
+
+                margin-bottom: 12px;
+            }
+
+            .hero-content p {
+                font-size: 1rem;
+
+                line-height: 1.6;
+            }
+
+            /* Keep original card images on mobile */
+
+            .showcase {
+                grid-template-columns:
+                    repeat(2, minmax(180px, 1fr));
+
+                gap: 16px;
+
+                padding: 30px 16px;
+            }
+
+            .showcase-card img {
+                height: 200px;
+            }
+
+            .introduction {
+                padding: 40px 18px 30px;
+            }
+
+            .introduction h2 {
+                font-size: 1.7rem;
+            }
+
+        }
+
+        /* =====================================================
+           SMALL MOBILE
+        ===================================================== */
+
+        @media (max-width: 576px) {
+
+            nav {
+                padding: 0 12px;
+
+                height: 58px;
+            }
+
+            .brand-logo {
+                font-size: 20px;
+            }
+
+            .nav-links {
+                gap: 6px;
+            }
+
+            .nav-links a {
+                font-size: 10px;
+            }
+
+            .nav-download-btn {
+                padding: 5px 9px;
+
+                font-size: 0.68rem;
+
+                border-width: 1px;
+            }
+
+            .header-text {
+                margin-top: 78px;
+            }
+
+            .header-text h1 {
+                font-size: 1.9rem;
+            }
+
+            .header-text p {
+                font-size: 0.9rem;
+            }
+
+            .hero {
+                height: 38vh;
+
+                min-height: 280px;
+
+                margin: 15px 10px 0;
+
+                border-radius: 15px;
+            }
+
+            .hero-content h2 {
+                font-size: 1.6rem;
+            }
+
+            .hero-content p {
+                font-size: 0.9rem;
+
+                line-height: 1.5;
+            }
+
+            /* Original cards remain on small mobile */
+
+            .showcase {
+                grid-template-columns: 1fr;
+
+                padding: 24px 12px;
+            }
+
+            .showcase-card img {
+                height: 180px;
+            }
+
+            .introduction {
+                padding: 30px 15px;
+            }
+
+            .introduction h2 {
+                font-size: 1.5rem;
+            }
+
+            .introduction p {
+                font-size: 0.9rem;
+
+                line-height: 1.7;
+            }
+
+            footer {
+                font-size: 0.85rem;
+            }
+
+        }
+
+    </style>
+
 </head>
 
 <body>
 
-<!-- NAVBAR -->
-<nav>
-    <h2 class="brand-logo"><span class="blue">Car</span><span class="orange">bnb</span></h2>
-    <div class="nav-links">
-        <a href="about.php">About</a>
-        <a href="contact.php">Contact</a>
-        <a href="auth/login.php">Login</a>
-        <a href="auth/register.php">Register</a>
-        <!-- ✅ NEW: Navbar Download Button -->
-        <a href="carbnb_install.php" class="nav-download-btn">📱 Download App</a>
-    </div>
-</nav>
+    <!-- =====================================================
+         NAVBAR
+    ===================================================== -->
 
-<!-- TITLE + SUBTITLE -->
-<section class="header-text">
-    <h1>
-        <span class="blue">Car</span><span class="orange">bnb</span>
-    </h1>
-    <p>A Self-Drive Rental Platform for Private Vehicle Owners</p>
-</section>
+    <nav>
 
-<!-- HERO BANNER -->
-<section class="hero" id="hero">
-    <div class="hero-content">
-        <h2>Drive Luxury. Rent Easily.</h2>
-        <p>Discover premium vehicles from trusted owners with effortless self-drive booking.</p>
-        <!-- ❌ REMOVED: Large download button from hero section -->
-    </div>
-</section>
+        <h2 class="brand-logo">
+            <span class="blue">Car</span><span class="orange">bnb</span>
+        </h2>
 
-<section class="showcase">
-    <div class="showcase-card">
-        <img src="https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=900&q=80" alt="Luxury sports car">
-        <div class="showcase-card-content">
-            <h3>Luxury Collection</h3>
-            <p>Browse exclusive premium cars for city cruising, weekend escapes, and special events.</p>
+        <div class="nav-links">
+
+            <a href="about.php">
+                About
+            </a>
+
+            <a href="contact.php">
+                Contact
+            </a>
+
+            <a href="auth/login.php">
+                Login
+            </a>
+
+            <a href="auth/register.php">
+                Register
+            </a>
+
+            <a
+                href="carbnb_install.php"
+                class="nav-download-btn"
+            >
+                📱 Download App
+            </a>
+
         </div>
-    </div>
-    <div class="showcase-card">
-        <img src="https://images.unsplash.com/photo-1511919884226-fd3cad34687c?auto=format&fit=crop&w=900&q=80" alt="Modern SUV">
-        <div class="showcase-card-content">
-            <h3>Spacious SUVs</h3>
-            <p>Choose roomy and comfortable SUVs designed for family trips and long-distance travel.</p>
+
+    </nav>
+
+
+    <!-- =====================================================
+         TITLE
+    ===================================================== -->
+
+    <section class="header-text">
+
+        <h1>
+            <span class="blue">Car</span><span class="orange">bnb</span>
+        </h1>
+
+        <p>
+            A Self-Drive Rental Platform for Private Vehicle Owners
+        </p>
+
+    </section>
+
+
+    <!-- =====================================================
+         HERO
+    ===================================================== -->
+
+    <section
+        class="hero"
+        id="hero"
+    >
+
+        <div class="hero-content">
+
+            <h2>
+                Drive Luxury. Rent Easily.
+            </h2>
+
+            <p>
+                Discover premium vehicles from trusted owners
+                with effortless self-drive booking.
+            </p>
+
         </div>
-    </div>
-    <div class="showcase-card">
-        <img src="https://images.unsplash.com/photo-1525609004556-c46c7d6cf023?auto=format&fit=crop&w=900&q=80" alt="Convertible car">
-        <div class="showcase-card-content">
-            <h3>Sporty Rides</h3>
-            <p>Enjoy high-performance cars with sleek styling and advanced driving dynamics.</p>
+
+    </section>
+
+
+    <!-- =====================================================
+         ORIGINAL IMAGE CARDS
+    ===================================================== -->
+
+    <section class="showcase">
+
+        <!-- CARD 1 -->
+
+        <div class="showcase-card">
+
+            <img
+                src="https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=900&q=80"
+                alt="Luxury sports car"
+                loading="lazy"
+            >
+
+            <div class="showcase-card-content">
+
+                <h3>
+                    Luxury Collection
+                </h3>
+
+                <p>
+                    Browse exclusive premium cars for city cruising,
+                    weekend escapes, and special events.
+                </p>
+
+            </div>
+
         </div>
-    </div>
-</section>
 
-<!-- INTRODUCTION -->
-<section class="introduction">
-    <h2>Introduction</h2>
-    <p>
-        Carbnb is a web-based self-drive rental platform designed to modernize vehicle rental services.
-        It allows users to browse vehicles, check availability, and book easily while helping owners manage cars and income efficiently.
-    </p>
-</section>
 
-<!-- FOOTER -->
-<footer>
-    &copy; 2026 Carbnb. All rights reserved.
-</footer>
+        <!-- CARD 2 -->
 
-<script>
-const hero = document.getElementById("hero");
+        <div class="showcase-card">
 
-const images = [
-    "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=1400&q=80",
-    "https://images.unsplash.com/photo-1511919884226-fd3cad34687c?auto=format&fit=crop&w=1400&q=80",
-    "https://images.unsplash.com/photo-1525609004556-c46c7d6cf023?auto=format&fit=crop&w=1400&q=80"
-];
+            <img
+                src="https://images.unsplash.com/photo-1511919884226-fd3cad34687c?auto=format&fit=crop&w=900&q=80"
+                alt="Modern SUV"
+                loading="lazy"
+            >
 
-let current = 0;
+            <div class="showcase-card-content">
 
-function updateHeroImage(index) {
-    hero.style.opacity = "0";
+                <h3>
+                    Spacious SUVs
+                </h3>
 
-    setTimeout(() => {
-        hero.style.backgroundImage = `url("${images[index]}")`;
-        hero.style.opacity = "1";
-    }, 300);
-}
+                <p>
+                    Choose roomy and comfortable SUVs designed
+                    for family trips and long-distance travel.
+                </p>
 
-function nextImage() {
-    current = (current + 1) % images.length;
-    updateHeroImage(current);
-}
+            </div>
 
-// Initial image
-hero.style.backgroundImage = `url("${images[0]}")`;
-hero.style.transition = "opacity 0.7s ease-in-out";
+        </div>
 
-// Start slideshow
-setInterval(nextImage, 9000);
-</script>
+
+        <!-- CARD 3 -->
+
+        <div class="showcase-card">
+
+            <img
+                src="https://images.unsplash.com/photo-1525609004556-c46c7d6cf023?auto=format&fit=crop&w=900&q=80"
+                alt="Convertible car"
+                loading="lazy"
+            >
+
+            <div class="showcase-card-content">
+
+                <h3>
+                    Sporty Rides
+                </h3>
+
+                <p>
+                    Enjoy high-performance cars with sleek styling
+                    and advanced driving dynamics.
+                </p>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- =====================================================
+         INTRODUCTION
+    ===================================================== -->
+
+    <section class="introduction">
+
+        <h2>
+            Introduction
+        </h2>
+
+        <p>
+            Carbnb is a web-based self-drive rental platform
+            designed to modernize vehicle rental services.
+            It allows users to browse vehicles, check availability,
+            and book easily while helping owners manage cars
+            and income efficiently.
+        </p>
+
+    </section>
+
+
+    <!-- =====================================================
+         FOOTER
+    ===================================================== -->
+
+    <footer>
+
+        &copy; 2026 Carbnb. All rights reserved.
+
+    </footer>
+
+
+    <!-- =====================================================
+         HERO IMAGE SLIDESHOW
+         ORIGINAL SYSTEM
+    ===================================================== -->
+
+    <script>
+
+        document.addEventListener("DOMContentLoaded", function () {
+
+            const hero = document.getElementById("hero");
+
+            if (!hero) {
+                return;
+            }
+
+            /*
+             * IMPORTANT:
+             * These are REAL URLs.
+             * Do NOT put [ ] or ( ) around them.
+             */
+
+            const images = [
+
+                "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=1400&q=80",
+
+                "https://images.unsplash.com/photo-1511919884226-fd3cad34687c?auto=format&fit=crop&w=1400&q=80",
+
+                "https://images.unsplash.com/photo-1525609004556-c46c7d6cf023?auto=format&fit=crop&w=1400&q=80"
+
+            ];
+
+            let current = 0;
+
+            function updateHeroImage(index) {
+
+                hero.style.opacity = "0";
+
+                setTimeout(function () {
+
+                    hero.style.backgroundImage =
+                        'url("' + images[index] + '")';
+
+                    hero.style.opacity = "1";
+
+                }, 300);
+
+            }
+
+            /*
+             * Initial hero image
+             */
+
+            hero.style.backgroundImage =
+                'url("' + images[0] + '")';
+
+            hero.style.transition =
+                "opacity 0.7s ease-in-out";
+
+
+            /*
+             * Start slideshow
+             */
+
+            setInterval(function () {
+
+                current =
+                    (current + 1) % images.length;
+
+                updateHeroImage(current);
+
+            }, 9000);
+
+        });
+
+    </script>
 
 </body>
+
 </html>
