@@ -510,6 +510,13 @@ if ($ajax && ($_GET['section'] ?? '') === 'payment-status') {
                 if (result.success) {
                     // Mark as completed
                     uploadCompleted = true;
+
+                    // BUG FIX: this used to never get reset to false here,
+                    // which permanently blocked the 8-second auto-refresh
+                    // (see the guard in refreshSection below) any time the
+                    // later refreshPaymentStatus() call failed or was slow -
+                    // making the page look "stuck" after a successful upload.
+                    uploadInProgress = false;
                     
                     // Show permanent success message
                     showUploadStatus('✅ ' + (result.message || 'Payment proof uploaded successfully! Waiting for admin verification.'), 'success', true);
@@ -523,10 +530,11 @@ if ($ajax && ($_GET['section'] ?? '') === 'payment-status') {
                     // DO NOT clear the file input - keep it showing the selected file
                     // fileInput.value = ''; // REMOVED - this was causing the "disappearing" issue
                     
-                    // Refresh payment status after a delay to show pending status
-                    setTimeout(function() {
-                        refreshPaymentStatus();
-                    }, 3000);
+                    // Refresh payment status after a delay to show pending status.
+                    // BUG FIX: this previously had no retry/fallback - if this one
+                    // fetch failed (slow host, brief network hiccup), the page
+                    // silently stayed on the old state forever. Now retries once.
+                    refreshPaymentStatusWithRetry();
                     
                 } else {
                     // Show error message
@@ -539,8 +547,13 @@ if ($ajax && ($_GET['section'] ?? '') === 'payment-status') {
                 }
             } catch(error) {
                 console.error('Upload Error:', error);
-                showUploadStatus('Payment proof submission failed. Please try again.', 'error');
-                
+                // On slow free hosting, a timeout/network error here does NOT
+                // necessarily mean the upload failed server-side - it may have
+                // gone through. Let the user know and re-check status shortly,
+                // instead of just calling it a failure.
+                showUploadStatus('Upload is taking longer than expected. Checking status...', 'info', true);
+                setTimeout(refreshPaymentStatusWithRetry, 2000);
+
                 // Reset upload state
                 uploadInProgress = false;
                 submitBtn.disabled = false;
@@ -548,6 +561,39 @@ if ($ajax && ($_GET['section'] ?? '') === 'payment-status') {
             }
         }
     });
+
+    // Retries the status refresh once if the first attempt fails, and
+    // ALWAYS resets uploadInProgress/uploadCompleted afterwards (success
+    // or failure) so the page never gets permanently stuck.
+    function refreshPaymentStatusWithRetry(attempt) {
+        attempt = attempt || 1;
+        const paymentStatusNode = document.getElementById('renter-payment-status');
+        if (!paymentStatusNode || !paymentStatusNode.dataset.liveRefresh) {
+            return;
+        }
+
+        fetch(paymentStatusNode.dataset.liveRefresh)
+            .then(function(response) { return response.text(); })
+            .then(function(html) {
+                paymentStatusNode.innerHTML = html;
+                uploadInProgress = false;
+                uploadCompleted = false;
+            })
+            .catch(function(error) {
+                console.log('Payment status refresh failed (attempt ' + attempt + '):', error);
+                if (attempt < 2) {
+                    setTimeout(function() {
+                        refreshPaymentStatusWithRetry(attempt + 1);
+                    }, 3000);
+                } else {
+                    // Give up trying to refresh silently - reset the flags
+                    // anyway so the normal 8s polling can pick it up later,
+                    // instead of leaving the page frozen.
+                    uploadInProgress = false;
+                    uploadCompleted = false;
+                }
+            });
+    }
 
     // AUTO PAYMENT STATUS REFRESH
     (function() {
@@ -557,7 +603,25 @@ if ($ajax && ($_GET['section'] ?? '') === 'payment-status') {
             const refreshUrl = node.dataset.liveRefresh;
             const targetSelector = node.dataset.liveTarget || '#' + node.id;
 
+            // Prevents a new poll from starting while a previous one is
+            // still waiting on a slow response - without this, on a slow
+            // host multiple requests can pile up and compete with the
+            // actual upload request for the same limited server resources.
+            let refreshInFlight = false;
+
             function refreshSection() {
+                // Skip entirely if the tab isn't visible - no point polling
+                // a page nobody's looking at, and it frees up server capacity
+                // for when the user actually comes back and uploads something.
+                if (document.hidden) {
+                    return;
+                }
+
+                // Skip if a previous poll hasn't finished yet.
+                if (refreshInFlight) {
+                    return;
+                }
+
                 // Skip this refresh cycle if the user currently has a file chosen
                 // (or an upload is in flight) - otherwise the innerHTML swap below
                 // replaces the <input type="file"> and instantly clears it.
@@ -566,6 +630,8 @@ if ($ajax && ($_GET['section'] ?? '') === 'payment-status') {
                 if (uploadInProgress || (hasPendingSelection && !uploadCompleted)) {
                     return;
                 }
+
+                refreshInFlight = true;
 
                 fetch(refreshUrl)
                     .then(function(response) {
@@ -599,14 +665,28 @@ if ($ajax && ($_GET['section'] ?? '') === 'payment-status') {
                     })
                     .catch(function(error) {
                         console.log('Live refresh failed:', error);
+                    })
+                    .finally(function() {
+                        refreshInFlight = false;
                     });
             }
 
             // Initial refresh
             refreshSection();
             
-            // Set interval for auto-refresh
-            setInterval(refreshSection, 8000);
+            // Set interval for auto-refresh.
+            // Slowed from 8s to 20s - constant 8-second polling adds real
+            // load on free/shared hosting (limited concurrent PHP processes),
+            // and was likely contributing to the delays during upload.
+            setInterval(refreshSection, 20000);
+
+            // Also refresh immediately whenever the tab becomes visible
+            // again, so switching back doesn't leave a stale 20s-old view.
+            document.addEventListener('visibilitychange', function() {
+                if (!document.hidden) {
+                    refreshSection();
+                }
+            });
         });
     })();
     </script>

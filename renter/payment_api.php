@@ -1,4 +1,25 @@
 <?php
+
+// Small helper to convert PHP ini shorthand values (e.g. "8M", "2G")
+// into a plain byte count, so we can compare against actual file sizes.
+if (!function_exists('ini_parse_quantity')) {
+    function ini_parse_quantity(string $val): int
+    {
+        $val = trim($val);
+        if ($val === '' || $val === '0') {
+            return 0;
+        }
+        $last = strtolower($val[strlen($val) - 1]);
+        $num = (int) $val;
+        switch ($last) {
+            case 'g': $num *= 1024 * 1024 * 1024; break;
+            case 'm': $num *= 1024 * 1024; break;
+            case 'k': $num *= 1024; break;
+        }
+        return $num;
+    }
+}
+
 require_once '../database/db.php';
 
 if (session_status() === PHP_SESSION_NONE) {
@@ -60,10 +81,34 @@ if (!$booking) {
 $amount = (float) $booking['total_price'];
 
 // Validate uploaded receipt/proof image
-if (!isset($_FILES['proof_image']) || $_FILES['proof_image']['error'] !== UPLOAD_ERR_OK) {
+if (!isset($_FILES['proof_image'])) {
     echo json_encode([
         'success' => false,
-        'message' => 'Please upload a valid receipt or proof of payment image.'
+        'message' => 'Please choose a receipt image to upload.'
+    ]);
+    exit;
+}
+
+// Give a SPECIFIC reason instead of a generic "invalid file" message.
+// This matters a lot on free hosting, where the server's own upload
+// limits (upload_max_filesize / post_max_size) are often smaller than
+// what this app assumes - a file that looks fine here can still get
+// rejected by PHP itself before this script ever sees it properly.
+if ($_FILES['proof_image']['error'] !== UPLOAD_ERR_OK) {
+    $uploadErrors = [
+        UPLOAD_ERR_INI_SIZE   => 'This file is larger than the server allows (server limit: ' . ini_get('upload_max_filesize') . '). Please upload a smaller image.',
+        UPLOAD_ERR_FORM_SIZE  => 'This file is larger than the server allows. Please upload a smaller image.',
+        UPLOAD_ERR_PARTIAL    => 'The upload was interrupted partway through. Please try again.',
+        UPLOAD_ERR_NO_FILE    => 'No file was received. Please choose an image and try again.',
+        UPLOAD_ERR_NO_TMP_DIR => 'Server storage issue (no temp folder). Please contact support.',
+        UPLOAD_ERR_CANT_WRITE => 'Server storage issue (couldn\'t write file). Please contact support.',
+        UPLOAD_ERR_EXTENSION  => 'The upload was blocked by a server setting. Please contact support.',
+    ];
+
+    echo json_encode([
+        'success' => false,
+        'message' => $uploadErrors[$_FILES['proof_image']['error']]
+            ?? 'Upload failed (error code ' . $_FILES['proof_image']['error'] . '). Please try again.'
     ]);
     exit;
 }
@@ -79,10 +124,22 @@ if (!in_array($fileType, $allowedTypes, true)) {
     exit;
 }
 
-if ($_FILES['proof_image']['size'] > 5 * 1024 * 1024) {
+// Use the SMALLER of our own 5MB cap and whatever the server actually
+// allows, so the limit we enforce always matches reality.
+$serverLimitBytes = min(
+    (int) ini_parse_quantity(ini_get('upload_max_filesize')),
+    (int) ini_parse_quantity(ini_get('post_max_size'))
+);
+$appLimitBytes = 5 * 1024 * 1024;
+$effectiveLimitBytes = ($serverLimitBytes > 0)
+    ? min($serverLimitBytes, $appLimitBytes)
+    : $appLimitBytes;
+
+if ($_FILES['proof_image']['size'] > $effectiveLimitBytes) {
+    $limitMb = round($effectiveLimitBytes / 1024 / 1024, 1);
     echo json_encode([
         'success' => false,
-        'message' => 'Receipt image must be less than 5MB.'
+        'message' => "Receipt image must be less than {$limitMb}MB."
     ]);
     exit;
 }
