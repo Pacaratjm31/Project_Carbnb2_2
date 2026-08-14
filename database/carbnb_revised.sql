@@ -1,22 +1,5 @@
--- ============================================================
--- CARBNB DATABASE
--- InfinityFree / phpMyAdmin Compatible Version
--- ============================================================
---
--- IMPORTANT:
--- Select your actual Carbnb database in phpMyAdmin BEFORE
--- running this SQL.
---
--- Do NOT use:
--- USE carbnb;
---
--- InfinityFree database names normally have an account prefix.
--- ============================================================
+USE carbnb;
 
-
--- ============================================================
--- USERS TABLE
--- ============================================================
 CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
 
