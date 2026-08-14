@@ -148,29 +148,6 @@ if ($ajax && ($_GET['section'] ?? '') === 'registered-users') {
     .face-status.not-verified {
       color: var(--danger);
     }
-    /* Image loading styles for modal */
-    .doc-item img,
-    .face-preview img {
-      transition: opacity 0.3s ease;
-    }
-    .doc-item img.loaded,
-    .face-preview img.loaded {
-      opacity: 1;
-    }
-    .doc-item img:not(.loaded),
-    .face-preview img:not(.loaded) {
-      opacity: 0;
-    }
-    .doc-item img.loading,
-    .face-preview img.loading {
-      background: linear-gradient(90deg, #1a1a1a 25%, #2a2a2a 50%, #1a1a1a 75%);
-      background-size: 200% 100%;
-      animation: shimmer 1.5s infinite;
-    }
-    @keyframes shimmer {
-      0% { background-position: -200% 0; }
-      100% { background-position: 200% 0; }
-    }
   </style>
 </head>
 <body>
@@ -298,15 +275,12 @@ if ($ajax && ($_GET['section'] ?? '') === 'registered-users') {
   </div>
 
 <script>
-    // User data for modal - fetched via AJAX
     let usersData = [];
 
     function openDocModal(userId, userName, userRole) {
-      // Find user in cached data or fetch from server
       const user = usersData.find(u => u.id == userId);
       
       if (!user) {
-        // Fetch user data via AJAX
         fetch('manage_users.php?get_user_data=' + userId)
           .then(response => response.json())
           .then(data => {
@@ -327,7 +301,6 @@ if ($ajax && ($_GET['section'] ?? '') === 'registered-users') {
       
       let content = '';
       
-      // Document section - show for both renter and owner
       if (user.documents && user.documents.length > 0) {
         content += '<div class="doc-section"><h4>Uploaded Documents</h4><div class="doc-grid">';
         
@@ -341,7 +314,7 @@ if ($ajax && ($_GET['section'] ?? '') === 'registered-users') {
           if (isVideo) {
             content += '<video controls preload="metadata"><source src="../' + doc.file_path + '" type="video/webm">Your browser does not support the video tag.</video>';
           } else {
-            content += '<img src="../' + doc.file_path + '" alt="' + docLabel + '" loading="lazy" decoding="async" onerror="this.src=\'../assets/placeholder.png\'" class="loading">';
+            content += '<img src="../' + doc.file_path + '" alt="' + docLabel + '" loading="lazy" decoding="async" onerror="this.src=\'../assets/placeholder.png\'">';
           }
           
           content += '<a href="../' + doc.file_path + '" target="_blank">View Full</a>';
@@ -353,13 +326,12 @@ if ($ajax && ($_GET['section'] ?? '') === 'registered-users') {
         content += '<div class="doc-section"><h4>Uploaded Documents</h4><p style="color: var(--muted);">No documents uploaded.</p></div>';
       }
 
-      // Face section - only for renters
       if (userRole === 'renter') {
         content += '<div class="doc-section"><h4>Face Verification</h4>';
         
         if (user.face_image_path) {
           content += '<div class="face-preview">';
-          content += '<img src="../' + user.face_image_path + '" alt="Face Image" loading="lazy" decoding="async" onerror="this.style.display=\'none\'" class="loading">';
+          content += '<img src="../' + user.face_image_path + '" alt="Face Image" loading="lazy" decoding="async" onerror="this.style.display=\'none\'">';
           content += '<div class="face-status ' + (user.face_verified == 1 ? 'verified' : 'not-verified') + '">';
           content += user.face_verified == 1 ? '✓ Face Verified' : '✗ Face Not Verified';
           content += '</div></div>';
@@ -372,24 +344,6 @@ if ($ajax && ($_GET['section'] ?? '') === 'registered-users') {
 
       document.getElementById('modalContent').innerHTML = content;
       document.getElementById('docModal').classList.add('active');
-
-      // Apply image loading handlers to modal images
-      document.querySelectorAll('#modalContent img').forEach(function(img) {
-        img.classList.add('loading');
-        if (img.complete) {
-          img.classList.remove('loading');
-          img.classList.add('loaded');
-        } else {
-          img.addEventListener('load', function() {
-            this.classList.remove('loading');
-            this.classList.add('loaded');
-          });
-          img.addEventListener('error', function() {
-            this.classList.remove('loading');
-            this.classList.add('loaded');
-          });
-        }
-      });
     }
 
     function closeDocModal() {
@@ -462,7 +416,6 @@ if ($ajax && ($_GET['section'] ?? '') === 'registered-users') {
         });
       });
 
-      // Close modal on overlay click
       document.getElementById('docModal').addEventListener('click', function(e) {
         if (e.target === this) {
           closeDocModal();
@@ -470,7 +423,6 @@ if ($ajax && ($_GET['section'] ?? '') === 'registered-users') {
       });
     });
 
-    // Live refresh with improved error handling
     (function () {
       const liveTargets = document.querySelectorAll('[data-live-refresh]');
       let refreshIntervals = [];

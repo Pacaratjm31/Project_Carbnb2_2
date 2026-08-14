@@ -168,6 +168,9 @@ if ($ajax && ($_GET['section'] ?? '') === 'booking-history') {
   </div>
 
   <script>
+    // ============================================================
+    // SIDEBAR TOGGLE - FIXED
+    // ============================================================
     document.addEventListener('DOMContentLoaded', function () {
       const sidebar = document.querySelector('.sidebar');
       const overlay = document.querySelector('.overlay');
@@ -175,20 +178,22 @@ if ($ajax && ($_GET['section'] ?? '') === 'booking-history') {
       const closeBtn = document.querySelector('.sidebar-close');
 
       function openSidebar() {
-        sidebar.classList.add('open');
-        overlay.classList.add('show');
+        if (sidebar) sidebar.classList.add('open');
+        if (overlay) overlay.classList.add('show');
         document.body.classList.add('sidebar-open');
       }
 
       function closeSidebar() {
-        sidebar.classList.remove('open');
-        overlay.classList.remove('show');
+        if (sidebar) sidebar.classList.remove('open');
+        if (overlay) overlay.classList.remove('show');
         document.body.classList.remove('sidebar-open');
       }
 
       if (toggleBtn) {
-        toggleBtn.addEventListener('click', function () {
-          if (sidebar.classList.contains('open')) {
+        toggleBtn.addEventListener('click', function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          if (sidebar && sidebar.classList.contains('open')) {
             closeSidebar();
           } else {
             openSidebar();
@@ -197,22 +202,53 @@ if ($ajax && ($_GET['section'] ?? '') === 'booking-history') {
       }
 
       if (closeBtn) {
-        closeBtn.addEventListener('click', closeSidebar);
+        closeBtn.addEventListener('click', function (e) {
+          e.preventDefault();
+          closeSidebar();
+        });
       }
 
       if (overlay) {
-        overlay.addEventListener('click', closeSidebar);
+        overlay.addEventListener('click', function (e) {
+          if (e.target === this) {
+            closeSidebar();
+          }
+        });
       }
 
       document.querySelectorAll('.sidebar-nav a').forEach(function (link) {
         link.addEventListener('click', function () {
-          if (window.innerWidth <= 900) {
+          if (window.innerWidth <= 992) {
             closeSidebar();
           }
         });
       });
+
+      window.addEventListener('resize', function () {
+        if (window.innerWidth > 992) {
+          closeSidebar();
+        }
+      });
+
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+          closeSidebar();
+        }
+      });
     });
 
+    function showRejectModal(bookingId) {
+      document.getElementById('rejectBookingId').value = bookingId;
+      document.getElementById('rejectModal').style.display = 'flex';
+    }
+
+    function closeRejectModal() {
+      document.getElementById('rejectModal').style.display = 'none';
+    }
+
+    // ============================================================
+    // LIVE REFRESH
+    // ============================================================
     (function () {
       const liveTargets = document.querySelectorAll('[data-live-refresh]');
       let refreshIntervals = [];
@@ -256,15 +292,6 @@ if ($ajax && ($_GET['section'] ?? '') === 'booking-history') {
         });
       });
     })();
-
-    function showRejectModal(bookingId) {
-      document.getElementById('rejectBookingId').value = bookingId;
-      document.getElementById('rejectModal').style.display = 'flex';
-    }
-
-    function closeRejectModal() {
-      document.getElementById('rejectModal').style.display = 'none';
-    }
   </script>
 </body>
 </html>

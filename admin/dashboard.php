@@ -165,6 +165,9 @@ if ($ajax && ($_GET['section'] ?? '') === 'overview-table') {
   </div>
 
   <script>
+    // ============================================================
+    // SIDEBAR TOGGLE - FIXED
+    // ============================================================
     document.addEventListener('DOMContentLoaded', function () {
       const sidebar = document.querySelector('.sidebar');
       const overlay = document.querySelector('.overlay');
@@ -172,20 +175,22 @@ if ($ajax && ($_GET['section'] ?? '') === 'overview-table') {
       const closeBtn = document.querySelector('.sidebar-close');
 
       function openSidebar() {
-        sidebar.classList.add('open');
-        overlay.classList.add('show');
+        if (sidebar) sidebar.classList.add('open');
+        if (overlay) overlay.classList.add('show');
         document.body.classList.add('sidebar-open');
       }
 
       function closeSidebar() {
-        sidebar.classList.remove('open');
-        overlay.classList.remove('show');
+        if (sidebar) sidebar.classList.remove('open');
+        if (overlay) overlay.classList.remove('show');
         document.body.classList.remove('sidebar-open');
       }
 
       if (toggleBtn) {
-        toggleBtn.addEventListener('click', function () {
-          if (sidebar.classList.contains('open')) {
+        toggleBtn.addEventListener('click', function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          if (sidebar && sidebar.classList.contains('open')) {
             closeSidebar();
           } else {
             openSidebar();
@@ -194,22 +199,44 @@ if ($ajax && ($_GET['section'] ?? '') === 'overview-table') {
       }
 
       if (closeBtn) {
-        closeBtn.addEventListener('click', closeSidebar);
+        closeBtn.addEventListener('click', function (e) {
+          e.preventDefault();
+          closeSidebar();
+        });
       }
 
       if (overlay) {
-        overlay.addEventListener('click', closeSidebar);
+        overlay.addEventListener('click', function (e) {
+          if (e.target === this) {
+            closeSidebar();
+          }
+        });
       }
 
       document.querySelectorAll('.sidebar-nav a').forEach(function (link) {
         link.addEventListener('click', function () {
-          if (window.innerWidth <= 900) {
+          if (window.innerWidth <= 992) {
             closeSidebar();
           }
         });
       });
+
+      window.addEventListener('resize', function () {
+        if (window.innerWidth > 992) {
+          closeSidebar();
+        }
+      });
+
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+          closeSidebar();
+        }
+      });
     });
 
+    // ============================================================
+    // LIVE REFRESH
+    // ============================================================
     (function () {
       const refreshTargets = document.querySelectorAll('[data-live-refresh]');
       refreshTargets.forEach(function (element) {

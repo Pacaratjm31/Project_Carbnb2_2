@@ -691,13 +691,6 @@ a:focus {
 }
 
 /* ===========================
-   Responsive
-   All @media rules for this file now live in
-   admin_responsive.css, loaded after this file and
-   admin_style_backup.css on every page.
-=========================== */
-
-/* ===========================
    Login/Register Pages
 =========================== */
 

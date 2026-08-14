@@ -9,7 +9,6 @@ if ($ajax && ($_GET['section'] ?? '') === 'pending-vehicles') {
       echo '<div class="vehicle-card">';
       echo '<div class="vehicle-image">';
       if (!empty($vehicle['image'])) {
-        // Add loading="lazy" and decoding="async" to images
         echo '<img src="../' . clean($vehicle['image']) . '" alt="' . clean($vehicle['name']) . '" loading="lazy" decoding="async" onerror="this.src=\'../uploads/vehicles/default-car.svg\'">';
       } else {
         echo '<div class="no-image">No Image</div>';
@@ -53,7 +52,6 @@ if ($ajax && ($_GET['section'] ?? '') === 'pending-vehicles') {
   <link rel="stylesheet" href="css/admin_style_backup.css?v=20260702">
   <link rel="stylesheet" href="css/admin_responsive.css?v=20260801">
   <style>
-    /* Image loading styles */
     .vehicle-image img {
       background: #f0f0f0;
       transition: opacity 0.3s ease;
@@ -226,8 +224,75 @@ if ($ajax && ($_GET['section'] ?? '') === 'pending-vehicles') {
   </div>
 
   <script>
-    // Image loading handler
+    // ============================================================
+    // SIDEBAR TOGGLE - FIXED
+    // ============================================================
     document.addEventListener('DOMContentLoaded', function () {
+      const sidebar = document.querySelector('.sidebar');
+      const overlay = document.querySelector('.overlay');
+      const toggleBtn = document.querySelector('.sidebar-toggle');
+      const closeBtn = document.querySelector('.sidebar-close');
+
+      function openSidebar() {
+        if (sidebar) sidebar.classList.add('open');
+        if (overlay) overlay.classList.add('show');
+        document.body.classList.add('sidebar-open');
+      }
+
+      function closeSidebar() {
+        if (sidebar) sidebar.classList.remove('open');
+        if (overlay) overlay.classList.remove('show');
+        document.body.classList.remove('sidebar-open');
+      }
+
+      if (toggleBtn) {
+        toggleBtn.addEventListener('click', function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          if (sidebar && sidebar.classList.contains('open')) {
+            closeSidebar();
+          } else {
+            openSidebar();
+          }
+        });
+      }
+
+      if (closeBtn) {
+        closeBtn.addEventListener('click', function (e) {
+          e.preventDefault();
+          closeSidebar();
+        });
+      }
+
+      if (overlay) {
+        overlay.addEventListener('click', function (e) {
+          if (e.target === this) {
+            closeSidebar();
+          }
+        });
+      }
+
+      document.querySelectorAll('.sidebar-nav a').forEach(function (link) {
+        link.addEventListener('click', function () {
+          if (window.innerWidth <= 992) {
+            closeSidebar();
+          }
+        });
+      });
+
+      window.addEventListener('resize', function () {
+        if (window.innerWidth > 992) {
+          closeSidebar();
+        }
+      });
+
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+          closeSidebar();
+        }
+      });
+
+      // Image loading
       document.querySelectorAll('.vehicle-image img').forEach(function(img) {
         img.classList.add('loading');
         if (img.complete) {
@@ -246,53 +311,18 @@ if ($ajax && ($_GET['section'] ?? '') === 'pending-vehicles') {
       });
     });
 
-    // Sidebar functionality
-    document.addEventListener('DOMContentLoaded', function () {
-      const sidebar = document.querySelector('.sidebar');
-      const overlay = document.querySelector('.overlay');
-      const toggleBtn = document.querySelector('.sidebar-toggle');
-      const closeBtn = document.querySelector('.sidebar-close');
+    function showRejectModal(vehicleId) {
+      document.getElementById('rejectVehicleId').value = vehicleId;
+      document.getElementById('rejectModal').style.display = 'flex';
+    }
 
-      function openSidebar() {
-        sidebar.classList.add('open');
-        overlay.classList.add('show');
-        document.body.classList.add('sidebar-open');
-      }
+    function closeRejectModal() {
+      document.getElementById('rejectModal').style.display = 'none';
+    }
 
-      function closeSidebar() {
-        sidebar.classList.remove('open');
-        overlay.classList.remove('show');
-        document.body.classList.remove('sidebar-open');
-      }
-
-      if (toggleBtn) {
-        toggleBtn.addEventListener('click', function () {
-          if (sidebar.classList.contains('open')) {
-            closeSidebar();
-          } else {
-            openSidebar();
-          }
-        });
-      }
-
-      if (closeBtn) {
-        closeBtn.addEventListener('click', closeSidebar);
-      }
-
-      if (overlay) {
-        overlay.addEventListener('click', closeSidebar);
-      }
-
-      document.querySelectorAll('.sidebar-nav a').forEach(function (link) {
-        link.addEventListener('click', function () {
-          if (window.innerWidth <= 900) {
-            closeSidebar();
-          }
-        });
-      });
-    });
-
-    // Live refresh with improved error handling
+    // ============================================================
+    // LIVE REFRESH
+    // ============================================================
     (function () {
       const liveTarget = document.getElementById('admin-pending-vehicles');
       if (!liveTarget || !liveTarget.dataset.liveRefresh) return;
@@ -315,7 +345,6 @@ if ($ajax && ($_GET['section'] ?? '') === 'pending-vehicles') {
           })
           .then(function (html) {
             liveTarget.innerHTML = '<h3 class="section-title">Pending Vehicle Listings</h3>' + html;
-            // Re-apply image loading to new images
             document.querySelectorAll('.vehicle-image img').forEach(function(img) {
               img.classList.add('loading');
               if (img.complete) {
@@ -341,21 +370,10 @@ if ($ajax && ($_GET['section'] ?? '') === 'pending-vehicles') {
       refreshSection();
       refreshInterval = setInterval(refreshSection, 8000);
 
-      // Cleanup on page unload
       window.addEventListener('beforeunload', function() {
         clearInterval(refreshInterval);
       });
     })();
-
-    // Reject modal functions
-    function showRejectModal(vehicleId) {
-      document.getElementById('rejectVehicleId').value = vehicleId;
-      document.getElementById('rejectModal').style.display = 'flex';
-    }
-
-    function closeRejectModal() {
-      document.getElementById('rejectModal').style.display = 'none';
-    }
   </script>
 </body>
 </html>
