@@ -38,4 +38,11 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <!-- Declares that a camera is used but NOT strictly required to
+         install the app - avoids Play Store filtering out camera-less
+         devices, which doesn't matter for a direct-APK install but is
+         good practice. -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
 </manifest>
