@@ -125,6 +125,17 @@ public class MainActivity extends BridgeActivity {
             showNoInternetOverlay();
         }
 
+        // Extra safety net: re-check shortly after launch too. Covers the
+        // rare case where the very first page-load failure is handled by
+        // Capacitor's own default client before ours is attached below,
+        // so neither the check above nor our onReceivedError override
+        // catches it.
+        webView.postDelayed(() -> {
+            if (!isNetworkAvailable()) {
+                showNoInternetOverlay();
+            }
+        }, 2500);
+
         // --- Admin-page blocking + no-internet detection ---
         webView.setWebViewClient(new BridgeWebViewClient(this.bridge) {
             @Override
@@ -222,33 +233,43 @@ public class MainActivity extends BridgeActivity {
                 }
                 MainActivity.this.filePathCallback = filePathCallback;
 
-                // BUG FIX: launching the raw intent from createIntent()
-                // directly failed with "Unable to open file picker" on
-                // some phones/Android skins (e.g. MIUI), because that
-                // exact intent sometimes has no single app registered to
-                // handle it. Wrapping it in Android's own chooser dialog
-                // is far more reliable, with a plain fallback intent if
-                // even that fails.
-                Intent intent;
-                try {
-                    intent = fileChooserParams.createIntent();
-                } catch (Exception e) {
-                    intent = null;
+                // BUG FIX (v4): fileChooserParams.createIntent() (ACTION_GET_CONTENT)
+                // wrapped in Intent.createChooser() was resolving to Android's
+                // SHARE sheet ("Share via Nearby Share...") on some phones/OEM
+                // Android skins instead of a real file picker - completely
+                // unusable, since sharing isn't picking.
+                //
+                // ACTION_OPEN_DOCUMENT is a different, more standardized system
+                // action handled directly by Android's built-in Files app
+                // (DocumentsUI) on virtually every Android version/brand - it
+                // shows an actual folder browser (Downloads, Photos, Drive,
+                // "This device", etc.), matching the normal desktop-browser
+                // file-picking experience.
+                Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                intent.addCategory(Intent.CATEGORY_OPENABLE);
+                intent.setType("*/*");
+
+                String[] acceptTypes = fileChooserParams.getAcceptTypes();
+                if (acceptTypes != null
+                        && acceptTypes.length > 0
+                        && !(acceptTypes.length == 1 && acceptTypes[0].isEmpty())) {
+                    intent.putExtra(Intent.EXTRA_MIME_TYPES, acceptTypes);
                 }
 
-                if (intent == null) {
-                    intent = new Intent(Intent.ACTION_GET_CONTENT);
-                    intent.addCategory(Intent.CATEGORY_OPENABLE);
-                    intent.setType("*/*");
+                if (fileChooserParams.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE) {
+                    intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
                 }
 
                 try {
-                    fileChooserLauncher.launch(Intent.createChooser(intent, "Select File"));
+                    fileChooserLauncher.launch(intent);
                 } catch (ActivityNotFoundException e) {
+                    // Fall back to the simpler GET_CONTENT action if
+                    // OPEN_DOCUMENT somehow isn't available on this device.
                     try {
-                        // Last-resort fallback: try the plain intent
-                        // without the chooser wrapper.
-                        fileChooserLauncher.launch(intent);
+                        Intent fallback = new Intent(Intent.ACTION_GET_CONTENT);
+                        fallback.addCategory(Intent.CATEGORY_OPENABLE);
+                        fallback.setType("*/*");
+                        fileChooserLauncher.launch(fallback);
                     } catch (Exception e2) {
                         MainActivity.this.filePathCallback = null;
                         Toast.makeText(
