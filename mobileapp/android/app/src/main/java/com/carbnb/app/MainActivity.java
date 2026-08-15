@@ -1,9 +1,12 @@
 package com.carbnb.app;
 
 import android.Manifest;
+import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
@@ -44,6 +47,15 @@ public class MainActivity extends BridgeActivity {
     };
 
     private static final int CAMERA_PERMISSION_REQUEST_CODE = 1001;
+
+    // Brand colors, matching the website's dark theme (admin_style.css :root)
+    private static final int COLOR_BG = 0xFF0F1115;
+    private static final int COLOR_PANEL = 0xFF171C24;
+    private static final int COLOR_TEXT = 0xFFF5F7FB;
+    private static final int COLOR_MUTED = 0xFFA8B0BF;
+    private static final int COLOR_ACCENT = 0xFFF5B942;   // gold
+    private static final int COLOR_ACCENT_2 = 0xFF4CC9F0; // blue
+    private static final int COLOR_BORDER = 0x1AFFFFFF;
 
     // Holds the website's pending camera request while we wait for the
     // user to respond to Android's own "Allow Carbnb to use the camera?"
@@ -98,6 +110,20 @@ public class MainActivity extends BridgeActivity {
 
         setupNoInternetOverlay();
         registerNetworkCallback();
+
+        // BUG FIX: Capacitor starts loading the live site as part of its
+        // own bridge setup inside super.onCreate() above - BEFORE our
+        // custom WebViewClient (below) is attached. If there's no
+        // connection at cold start, that very first failure can be
+        // handled by Capacitor's default client instead of ours, so
+        // Android's plain built-in error page shows instead of our
+        // screen. Checking connectivity directly here, rather than only
+        // reacting to the WebView's error callback, closes that gap -
+        // this covers the WebView immediately regardless of any timing
+        // race with the page load.
+        if (!isNetworkAvailable()) {
+            showNoInternetOverlay();
+        }
 
         // --- Admin-page blocking + no-internet detection ---
         webView.setWebViewClient(new BridgeWebViewClient(this.bridge) {
@@ -196,15 +222,48 @@ public class MainActivity extends BridgeActivity {
                 }
                 MainActivity.this.filePathCallback = filePathCallback;
 
+                // BUG FIX: launching the raw intent from createIntent()
+                // directly failed with "Unable to open file picker" on
+                // some phones/Android skins (e.g. MIUI), because that
+                // exact intent sometimes has no single app registered to
+                // handle it. Wrapping it in Android's own chooser dialog
+                // is far more reliable, with a plain fallback intent if
+                // even that fails.
+                Intent intent;
                 try {
-                    Intent intent = fileChooserParams.createIntent();
-                    fileChooserLauncher.launch(intent);
+                    intent = fileChooserParams.createIntent();
+                } catch (Exception e) {
+                    intent = null;
+                }
+
+                if (intent == null) {
+                    intent = new Intent(Intent.ACTION_GET_CONTENT);
+                    intent.addCategory(Intent.CATEGORY_OPENABLE);
+                    intent.setType("*/*");
+                }
+
+                try {
+                    fileChooserLauncher.launch(Intent.createChooser(intent, "Select File"));
+                } catch (ActivityNotFoundException e) {
+                    try {
+                        // Last-resort fallback: try the plain intent
+                        // without the chooser wrapper.
+                        fileChooserLauncher.launch(intent);
+                    } catch (Exception e2) {
+                        MainActivity.this.filePathCallback = null;
+                        Toast.makeText(
+                            MainActivity.this,
+                            "No file picker app is available on this device.",
+                            Toast.LENGTH_LONG
+                        ).show();
+                        return false;
+                    }
                 } catch (Exception e) {
                     MainActivity.this.filePathCallback = null;
                     Toast.makeText(
                         MainActivity.this,
                         "Unable to open file picker.",
-                        Toast.LENGTH_SHORT
+                        Toast.LENGTH_LONG
                     ).show();
                     return false;
                 }
@@ -240,51 +299,111 @@ public class MainActivity extends BridgeActivity {
     }
 
     // ------------------------------------------------------------------
-    // No internet connection overlay
+    // No internet connection overlay - styled to match the app's branding
     // ------------------------------------------------------------------
 
     private void setupNoInternetOverlay() {
         FrameLayout overlay = new FrameLayout(this);
-        overlay.setBackgroundColor(0xFF1e1e1e); // matches the app's dark theme
+        overlay.setBackgroundColor(COLOR_BG);
         overlay.setVisibility(View.GONE);
         overlay.setClickable(true); // blocks touches from passing through to the WebView underneath
 
-        LinearLayout content = new LinearLayout(this);
-        content.setOrientation(LinearLayout.VERTICAL);
-        content.setGravity(Gravity.CENTER);
-        content.setPadding(80, 80, 80, 80);
+        // --- Rounded card ---
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setGravity(Gravity.CENTER);
+        card.setPadding(64, 72, 64, 72);
 
-        FrameLayout.LayoutParams contentParams = new FrameLayout.LayoutParams(
+        GradientDrawable cardBg = new GradientDrawable();
+        cardBg.setColor(COLOR_PANEL);
+        cardBg.setCornerRadius(36f);
+        cardBg.setStroke(2, COLOR_BORDER);
+        card.setBackground(cardBg);
+
+        FrameLayout.LayoutParams cardParams = new FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.WRAP_CONTENT,
             ViewGroup.LayoutParams.WRAP_CONTENT,
             Gravity.CENTER
         );
-        content.setLayoutParams(contentParams);
+        cardParams.leftMargin = 48;
+        cardParams.rightMargin = 48;
+        card.setLayoutParams(cardParams);
+        card.setElevation(24f);
+
+        // --- Icon circle ---
+        FrameLayout iconCircle = new FrameLayout(this);
+        GradientDrawable circleBg = new GradientDrawable();
+        circleBg.setShape(GradientDrawable.OVAL);
+        circleBg.setColor(0x224CC9F0); // translucent accent-2
+        LinearLayout.LayoutParams circleParams = new LinearLayout.LayoutParams(160, 160);
+        circleParams.bottomMargin = 32;
+        circleParams.gravity = Gravity.CENTER_HORIZONTAL;
+        iconCircle.setLayoutParams(circleParams);
+        iconCircle.setBackground(circleBg);
 
         TextView icon = new TextView(this);
-        icon.setText("\uD83D\uDCF6"); // 📶 signal icon
-        icon.setTextSize(48);
+        icon.setText("\uD83D\uDCF6"); // 📶
+        icon.setTextSize(44);
         icon.setGravity(Gravity.CENTER);
-        icon.setPadding(0, 0, 0, 24);
+        FrameLayout.LayoutParams iconInnerParams = new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            Gravity.CENTER
+        );
+        icon.setLayoutParams(iconInnerParams);
+        iconCircle.addView(icon);
 
+        // --- Title ---
         TextView title = new TextView(this);
         title.setText("No Internet Connection");
-        title.setTextColor(0xFFF5F7FB);
+        title.setTextColor(COLOR_TEXT);
         title.setTextSize(20);
         title.setGravity(Gravity.CENTER);
-        title.setPadding(0, 0, 0, 12);
+        title.setTypeface(title.getTypeface(), android.graphics.Typeface.BOLD);
+        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        titleParams.bottomMargin = 14;
+        title.setLayoutParams(titleParams);
 
+        // --- Subtitle ---
         TextView subtitle = new TextView(this);
-        subtitle.setText("Please check your Wi-Fi or mobile data and try again.");
-        subtitle.setTextColor(0xFFA8B0BF);
+        subtitle.setText("Please check your Wi-Fi or mobile data, then try again.");
+        subtitle.setTextColor(COLOR_MUTED);
         subtitle.setTextSize(14);
         subtitle.setGravity(Gravity.CENTER);
-        subtitle.setPadding(20, 0, 20, 32);
+        LinearLayout.LayoutParams subtitleParams = new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        subtitleParams.bottomMargin = 36;
+        subtitle.setLayoutParams(subtitleParams);
+        subtitle.setMaxWidth(720);
 
+        // --- Retry button (gold accent, rounded pill) ---
         Button retryButton = new Button(this);
         retryButton.setText("Retry");
         retryButton.setTextColor(0xFF111111);
-        retryButton.setBackgroundColor(0xFFF5B942); // matches the app's accent color
+        retryButton.setTextSize(15);
+        retryButton.setAllCaps(false);
+        retryButton.setTypeface(retryButton.getTypeface(), android.graphics.Typeface.BOLD);
+        retryButton.setPadding(72, 28, 72, 28);
+        retryButton.setStateListAnimator(null);
+
+        GradientDrawable buttonBg = new GradientDrawable(
+            GradientDrawable.Orientation.LEFT_RIGHT,
+            new int[]{COLOR_ACCENT, 0xFFFFCF66}
+        );
+        buttonBg.setCornerRadius(100f);
+        retryButton.setBackground(buttonBg);
+
+        LinearLayout.LayoutParams retryParams = new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        retryButton.setLayoutParams(retryParams);
+
         retryButton.setOnClickListener(v -> {
             if (isNetworkAvailable()) {
                 hideNoInternetOverlay();
@@ -294,11 +413,11 @@ public class MainActivity extends BridgeActivity {
             }
         });
 
-        content.addView(icon);
-        content.addView(title);
-        content.addView(subtitle);
-        content.addView(retryButton);
-        overlay.addView(content);
+        card.addView(iconCircle);
+        card.addView(title);
+        card.addView(subtitle);
+        card.addView(retryButton);
+        overlay.addView(card);
 
         this.noInternetOverlay = overlay;
 
