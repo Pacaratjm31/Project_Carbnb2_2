@@ -1,14 +1,32 @@
 package com.carbnb.app;
 
 import android.Manifest;
+import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
+import android.net.NetworkRequest;
+import android.net.Uri;
 import android.os.Bundle;
+import android.view.Gravity;
+import android.view.View;
+import android.view.ViewGroup;
 import android.webkit.PermissionRequest;
+import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
+import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebView;
+import android.widget.Button;
+import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
@@ -32,13 +50,56 @@ public class MainActivity extends BridgeActivity {
     // system dialog. Once that resolves, we grant or deny this.
     private PermissionRequest pendingWebPermissionRequest;
 
+    // --- File chooser support (Valid ID / Proof of Billing / etc. uploads) ---
+    // A plain WebView has NO built-in "Choose File" picker - unlike Chrome,
+    // it does nothing at all unless the app explicitly opens Android's own
+    // file picker and hands the result back to the website. This callback
+    // is how the website receives whatever file the user picked.
+    private ValueCallback<Uri[]> filePathCallback;
+
+    private final ActivityResultLauncher<Intent> fileChooserLauncher =
+        registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
+            if (filePathCallback == null) {
+                return;
+            }
+
+            Uri[] results = null;
+
+            if (result.getResultCode() == RESULT_OK && result.getData() != null) {
+                Intent data = result.getData();
+
+                if (data.getClipData() != null) {
+                    // Multiple files selected
+                    int count = data.getClipData().getItemCount();
+                    results = new Uri[count];
+                    for (int i = 0; i < count; i++) {
+                        results[i] = data.getClipData().getItemAt(i).getUri();
+                    }
+                } else if (data.getData() != null) {
+                    // Single file selected
+                    results = new Uri[]{ data.getData() };
+                }
+            }
+
+            filePathCallback.onReceiveValue(results);
+            filePathCallback = null;
+        });
+
+    // --- No internet connection handling ---
+    private View noInternetOverlay;
+    private WebView webView;
+    private ConnectivityManager.NetworkCallback networkCallback;
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        WebView webView = this.bridge.getWebView();
+        webView = this.bridge.getWebView();
 
-        // --- Admin-page blocking (unchanged from before) ---
+        setupNoInternetOverlay();
+        registerNetworkCallback();
+
+        // --- Admin-page blocking + no-internet detection ---
         webView.setWebViewClient(new BridgeWebViewClient(this.bridge) {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
@@ -60,13 +121,27 @@ public class MainActivity extends BridgeActivity {
 
                 return super.shouldOverrideUrlLoading(view, request);
             }
+
+            @Override
+            public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
+                super.onReceivedError(view, request, error);
+                // Only react to failures on the main page itself, not on
+                // a background image/script request failing.
+                if (request.isForMainFrame()) {
+                    showNoInternetOverlay();
+                }
+            }
+
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                // A page finished loading successfully - hide any leftover
+                // no-internet message.
+                hideNoInternetOverlay();
+            }
         });
 
-        // --- Camera permission handling for face registration/verification ---
-        // The website calls the browser's getUserMedia() camera API (used by
-        // face-api.js). Android WebView blocks this by default unless the
-        // app explicitly grants it here, AND the user has approved the
-        // normal Android camera permission dialog.
+        // --- Camera permission + file chooser for the website ---
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onPermissionRequest(final PermissionRequest request) {
@@ -108,6 +183,34 @@ public class MainActivity extends BridgeActivity {
             public void onPermissionRequestCanceled(PermissionRequest request) {
                 pendingWebPermissionRequest = null;
             }
+
+            @Override
+            public boolean onShowFileChooser(
+                    WebView webView,
+                    ValueCallback<Uri[]> filePathCallback,
+                    FileChooserParams fileChooserParams
+            ) {
+                // Cancel any previous pending chooser before starting a new one.
+                if (MainActivity.this.filePathCallback != null) {
+                    MainActivity.this.filePathCallback.onReceiveValue(null);
+                }
+                MainActivity.this.filePathCallback = filePathCallback;
+
+                try {
+                    Intent intent = fileChooserParams.createIntent();
+                    fileChooserLauncher.launch(intent);
+                } catch (Exception e) {
+                    MainActivity.this.filePathCallback = null;
+                    Toast.makeText(
+                        MainActivity.this,
+                        "Unable to open file picker.",
+                        Toast.LENGTH_SHORT
+                    ).show();
+                    return false;
+                }
+
+                return true;
+            }
         });
     }
 
@@ -133,6 +236,146 @@ public class MainActivity extends BridgeActivity {
             }
 
             pendingWebPermissionRequest = null;
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // No internet connection overlay
+    // ------------------------------------------------------------------
+
+    private void setupNoInternetOverlay() {
+        FrameLayout overlay = new FrameLayout(this);
+        overlay.setBackgroundColor(0xFF1e1e1e); // matches the app's dark theme
+        overlay.setVisibility(View.GONE);
+        overlay.setClickable(true); // blocks touches from passing through to the WebView underneath
+
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setGravity(Gravity.CENTER);
+        content.setPadding(80, 80, 80, 80);
+
+        FrameLayout.LayoutParams contentParams = new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            Gravity.CENTER
+        );
+        content.setLayoutParams(contentParams);
+
+        TextView icon = new TextView(this);
+        icon.setText("\uD83D\uDCF6"); // 📶 signal icon
+        icon.setTextSize(48);
+        icon.setGravity(Gravity.CENTER);
+        icon.setPadding(0, 0, 0, 24);
+
+        TextView title = new TextView(this);
+        title.setText("No Internet Connection");
+        title.setTextColor(0xFFF5F7FB);
+        title.setTextSize(20);
+        title.setGravity(Gravity.CENTER);
+        title.setPadding(0, 0, 0, 12);
+
+        TextView subtitle = new TextView(this);
+        subtitle.setText("Please check your Wi-Fi or mobile data and try again.");
+        subtitle.setTextColor(0xFFA8B0BF);
+        subtitle.setTextSize(14);
+        subtitle.setGravity(Gravity.CENTER);
+        subtitle.setPadding(20, 0, 20, 32);
+
+        Button retryButton = new Button(this);
+        retryButton.setText("Retry");
+        retryButton.setTextColor(0xFF111111);
+        retryButton.setBackgroundColor(0xFFF5B942); // matches the app's accent color
+        retryButton.setOnClickListener(v -> {
+            if (isNetworkAvailable()) {
+                hideNoInternetOverlay();
+                webView.reload();
+            } else {
+                Toast.makeText(this, "Still no connection.", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        content.addView(icon);
+        content.addView(title);
+        content.addView(subtitle);
+        content.addView(retryButton);
+        overlay.addView(content);
+
+        this.noInternetOverlay = overlay;
+
+        addContentView(
+            overlay,
+            new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        );
+    }
+
+    private boolean isNetworkAvailable() {
+        ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        if (cm == null) {
+            return false;
+        }
+        Network network = cm.getActiveNetwork();
+        if (network == null) {
+            return false;
+        }
+        NetworkCapabilities capabilities = cm.getNetworkCapabilities(network);
+        return capabilities != null && capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
+    }
+
+    private void showNoInternetOverlay() {
+        if (noInternetOverlay != null) {
+            runOnUiThread(() -> noInternetOverlay.setVisibility(View.VISIBLE));
+        }
+    }
+
+    private void hideNoInternetOverlay() {
+        if (noInternetOverlay != null) {
+            runOnUiThread(() -> noInternetOverlay.setVisibility(View.GONE));
+        }
+    }
+
+    // Watches for connectivity changes in the background - as soon as the
+    // connection comes back, automatically hide the message and reload
+    // the page, instead of making the user manually tap Retry.
+    private void registerNetworkCallback() {
+        ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        if (cm == null) {
+            return;
+        }
+
+        networkCallback = new ConnectivityManager.NetworkCallback() {
+            @Override
+            public void onAvailable(Network network) {
+                runOnUiThread(() -> {
+                    if (noInternetOverlay != null && noInternetOverlay.getVisibility() == View.VISIBLE) {
+                        hideNoInternetOverlay();
+                        webView.reload();
+                    }
+                });
+            }
+        };
+
+        NetworkRequest request = new NetworkRequest.Builder()
+            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            .build();
+
+        cm.registerNetworkCallback(request, networkCallback);
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (networkCallback != null) {
+            ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+            if (cm != null) {
+                try {
+                    cm.unregisterNetworkCallback(networkCallback);
+                } catch (Exception ignored) {
+                    // Already unregistered or never registered - safe to ignore.
+                }
+            }
         }
     }
 }
