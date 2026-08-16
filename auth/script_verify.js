@@ -1,4 +1,4 @@
-document.addEventListener("DOMContentLoaded", async () => {
+(async () => {
 
 const video = document.getElementById("video");
 const verifyBtn = document.getElementById("verifyBtn");
@@ -8,6 +8,15 @@ const registeredFaceImage = window.registeredFaceImage || "";
 
 let faceDetected = false;
 let isVerifying = false;
+
+// BUG FIX: previously waited for the "DOMContentLoaded" event before
+// running anything. Capacitor injects its own bridge code into every
+// page, which can affect exactly when that event fires inside the
+// app's WebView versus a normal browser tab - if it fires before this
+// listener attaches, the listener simply never runs. Since this script
+// tag sits at the bottom of <body>, after video/verifyBtn/statusMessage
+// already exist, the DOM is guaranteed ready by the time this runs, so
+// waiting for that event isn't needed here.
 
 if (!registeredFaceDescriptor.length) {
     statusMessage.textContent = "No registered face template found.";
@@ -24,9 +33,7 @@ try {
 
     // Force the CPU backend before loading models. TensorFlow.js
     // (which face-api.js runs on) defaults to a WebGL backend that
-    // can hang forever with no error inside Android WebView - this
-    // was the actual cause of getting stuck on "Loading face
-    // models..." with the camera never opening.
+    // can hang forever with no error inside Android WebView.
     if (window.faceapi && faceapi.tf && faceapi.tf.setBackend) {
         try {
             await faceapi.tf.setBackend("cpu");
@@ -149,4 +156,5 @@ verifyBtn.addEventListener("click", async () => {
         isVerifying = false;
     }
 });
-});
+
+})();

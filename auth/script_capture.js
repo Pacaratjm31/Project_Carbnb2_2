@@ -1,6 +1,4 @@
-document.addEventListener(
-    "DOMContentLoaded",
-    async () => {
+(async () => {
 
     const video =
         document.getElementById("video");
@@ -22,6 +20,19 @@ document.addEventListener(
 
     let isCapturing = false;
 
+    // BUG FIX: previously waited for the "DOMContentLoaded" event before
+    // running anything. Capacitor injects its own bridge code into every
+    // page, which can affect exactly when that event fires inside the
+    // app's WebView versus a normal browser tab - if it fires before this
+    // listener attaches, the listener simply never runs, and nothing on
+    // the page ever happens (matches exactly what was seen: page renders,
+    // but camera/status never update).
+    //
+    // Since this script tag sits at the very bottom of <body>, after
+    // video/captureBtn/statusMessage/etc. already exist in the page, the
+    // DOM is guaranteed to already be ready by the time this code runs -
+    // so waiting for that event isn't necessary here at all.
+
     // Start the camera right away, in parallel with model loading below,
     // instead of waiting for models to finish first. This is what makes
     // the camera preview open immediately after permission is granted.
@@ -34,9 +45,7 @@ document.addEventListener(
 
         // Force the CPU backend before loading models. TensorFlow.js
         // (which face-api.js runs on) defaults to a WebGL backend that
-        // can hang forever with no error inside Android WebView - this
-        // was the actual cause of getting stuck on "Loading face
-        // models..." with the camera never opening.
+        // can hang forever with no error inside Android WebView.
         if (window.faceapi && faceapi.tf && faceapi.tf.setBackend) {
             try {
                 await faceapi.tf.setBackend("cpu");
@@ -268,4 +277,4 @@ document.addEventListener(
 
     });
 
-});
+})();
