@@ -159,7 +159,7 @@ try {
 }
 
 // ============================================
-// Function to render a car card (used by both AJAX and main page)
+// Function to render a car card
 // ============================================
 function renderCarCard($car, $user_id, $conn, $account_state) {
     $status = $car['status'] ?? 'available';
@@ -177,15 +177,13 @@ function renderCarCard($car, $user_id, $conn, $account_state) {
         $class = 'status-maintenance';
     }
     
-    // Check if renter has a completed or returned booking for this vehicle
     $hasCompletedBooking = false;
     $hasReviewed = false;
     if (!$account_state['restricted']) {
-        $stmt = $conn->prepare("SELECT id FROM bookings WHERE renter_id = ? AND vehicle_id = ? AND (status = 'completed' OR status = 'return_requested') LIMIT 1");
+        $stmt = $conn->prepare("SELECT id FROM bookings WHERE renter_id = ? AND vehicle_id = ? AND status = 'completed' LIMIT 1");
         $stmt->execute([$user_id, $car['id']]);
         $hasCompletedBooking = (bool) $stmt->fetch();
         
-        // Check if already reviewed
         $stmt = $conn->prepare("SELECT id FROM reviews WHERE renter_id = ? AND vehicle_id = ? LIMIT 1");
         $stmt->execute([$user_id, $car['id']]);
         $hasReviewed = (bool) $stmt->fetch();
@@ -234,10 +232,10 @@ function renderCarCard($car, $user_id, $conn, $account_state) {
                     </button>
                 <?php elseif ($approval === 'approved'): ?>
                     <?php if ($status === 'available'): ?>
-                        <a href="book.php?car_id=<?= (int) $car['id'] ?>" class="book-btn">Book Now</a><br><br>
+                        <button class="book-btn book-now-btn" data-car-id="<?= (int) $car['id'] ?>">Book Now</button>
                     <?php endif; ?>
                     <?php if ($hasCompletedBooking && !$hasReviewed): ?>
-                        <a href="commet_rate.php?vehicle_id=<?= (int) $car['id'] ?>" class="book-btn" style="background:#17a2b8;">
+                        <a href="comment_rate.php?vehicle_id=<?= (int) $car['id'] ?>" class="book-btn" style="background:#17a2b8;">
                             Rate & Comment
                         </a><br><br>
                     <?php elseif ($hasReviewed): ?>
@@ -289,7 +287,6 @@ function build_vehicle_image_path($value): string {
 <link rel="stylesheet" href="css/renter_style.css?v=4">
 <link rel="stylesheet" href="css/renter_style_backup.css?v=4">
 <style>
-/* Lazy loading placeholder */
 .car-img {
     background: #f0f0f0;
     min-height: 200px;
@@ -305,61 +302,176 @@ function build_vehicle_image_path($value): string {
 .car-img:not(.loaded) {
     opacity: 0;
 }
-
-/* Loading shimmer effect */
 .car-img.loading {
     background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
     background-size: 200% 100%;
     animation: shimmer 1.5s infinite;
 }
-
 @keyframes shimmer {
     0% { background-position: -200% 0; }
     100% { background-position: 200% 0; }
+}
+
+/* ============================================================
+   LOCATION PERMISSION MODAL - IMPROVED
+   ============================================================ */
+.location-modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.6);
+    z-index: 9999;
+    justify-content: center;
+    align-items: center;
+    backdrop-filter: blur(4px);
+}
+.location-modal-overlay.show {
+    display: flex;
+}
+.location-modal {
+    background: #fff;
+    border-radius: 20px;
+    padding: 35px 40px;
+    max-width: 440px;
+    width: 92%;
+    box-shadow: 0 25px 80px rgba(0,0,0,0.35);
+    text-align: center;
+    animation: modalFadeIn 0.4s ease;
+    position: relative;
+}
+@keyframes modalFadeIn {
+    from { opacity: 0; transform: scale(0.92) translateY(-20px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
+.location-modal .modal-icon {
+    font-size: 48px;
+    margin-bottom: 12px;
+}
+.location-modal h3 {
+    margin: 0 0 8px 0;
+    color: #1a1a2e;
+    font-size: 20px;
+}
+.location-modal p {
+    color: #4b5563;
+    margin-bottom: 20px;
+    font-size: 14px;
+    line-height: 1.6;
+}
+.location-modal .modal-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+.location-modal .modal-actions button {
+    padding: 12px 32px;
+    border: none;
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 15px;
+    transition: all 0.2s;
+    min-width: 120px;
+}
+.location-modal .btn-allow {
+    background: #0d6efd;
+    color: #fff;
+}
+.location-modal .btn-allow:hover:not(:disabled) {
+    background: #0b5ed7;
+}
+.location-modal .btn-allow:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+.location-modal .btn-deny {
+    background: #e5e7eb;
+    color: #1a1a2e;
+}
+.location-modal .btn-deny:hover {
+    background: #d1d5db;
+}
+.location-modal .permission-status {
+    margin-top: 16px;
+    font-size: 14px;
+    color: #6b7280;
+    min-height: 24px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    transition: all 0.3s;
+}
+.location-modal .permission-status.loading {
+    color: #0d6efd;
+    background: #eff6ff;
+}
+.location-modal .permission-status.success {
+    color: #16a34a;
+    background: #dcfce7;
+}
+.location-modal .permission-status.error {
+    color: #dc2626;
+    background: #fee2e2;
+}
+.location-modal .permission-status .spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid #e5e7eb;
+    border-top-color: #0d6efd;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-right: 8px;
+    vertical-align: middle;
+}
+@keyframes spin {
+    to { transform: rotate(360deg); }
 }
 </style>
 </head>
 <body data-user-id="<?php echo (int) $user_id; ?>" data-current-status="<?php echo htmlspecialchars($renter['status'] ?? 'pending'); ?>">
 
-<div class="top-nav">
+<!-- ============================================================
+     LOCATION PERMISSION MODAL - IMPROVED
+     ============================================================ -->
+<div id="locationModal" class="location-modal-overlay">
+    <div class="location-modal">
+        <div class="modal-icon">📍</div>
+        <h3>Location Permission Required</h3>
+        <p>To complete your booking, we need access to your real GPS location. This helps us ensure a safe and secure rental experience.</p>
+        <div class="modal-actions">
+            <button id="modalAllowBtn" class="btn-allow">Allow Location</button>
+            <button id="modalDenyBtn" class="btn-deny">Don't Allow</button>
+        </div>
+        <div id="modalStatus" class="permission-status">Please allow location access to continue booking.</div>
+    </div>
+</div>
 
+<div class="top-nav">
     <div class="nav-left">
         <h2>Carbnb</h2>
     </div>
-
-    <!-- Mobile Menu Button -->
-    <button id="mobileMenuBtn" class="mobile-menu-btn">
-        ☰ Menu
-    </button>
-
-    <!-- Navigation -->
+    <button id="mobileMenuBtn" class="mobile-menu-btn">☰ Menu</button>
     <div class="nav-right" id="mobileMenu">
-
         <a href="browse.php" class="nav-all-cars active">All Cars</a>
-
         <?php if ($account_state['restricted']): ?>
-
             <span class="nav-link disabled-link">📋 My Records</span>
             <span class="nav-link disabled-link">👤 My Profile</span>
             <span class="nav-link disabled-link">💬 Messages</span>
-
         <?php else: ?>
-
             <a href="record.php" class="nav-my-records">My Records</a>
             <a href="view_profile.php" class="nav-my-profile">My Profile</a>
             <a href="renter_messages.php" class="nav-my-messages">Messages</a>
-
         <?php endif; ?>
-
         <a href="../auth/logout.php" class="logout-link">Logout</a>
-
     </div>
-
 </div>
 
 <div class="header-text">
     <h1>Browse <span class="blue">Available</span> <span class="orange">Cars</span></h1>
-
     <?php if (!empty($normalizedFilter)): ?>
         <p>Filtering by: <span class="blue"><?= htmlspecialchars($filter) ?></span></p>
     <?php else: ?>
@@ -377,7 +489,6 @@ function build_vehicle_image_path($value): string {
             <?= htmlspecialchars(renter_approval_label($renter['status'] ?? 'pending')) ?>
         </span>
     </div>
-
     <div class="status-card">
         <h3 class="status-card-title">Account Status</h3>
         <div class="status-grid">
@@ -392,11 +503,8 @@ function build_vehicle_image_path($value): string {
                 <span id="renter-approval-note" class="status-note"><?= htmlspecialchars(($renter['disapproval_reason'] ?? '') !== '' ? $renter['disapproval_reason'] : 'No admin note yet.') ?></span>
             </div>
         </div>
-        <div class="mt-3">
-            <button id="share-location-btn" class="book-btn" type="button" style="background:#0d6efd;">Share Live Location</button>
-            <p id="location-status" class="mt-2" style="margin-bottom:0; color:#4b5563;">Share your current GPS position so the admin can see your live movement.</p>
-        </div>
     </div>
+</div>
 
 <div class="filter-bar">
     <a href="browse.php" data-filter="all" class="<?= empty($normalizedFilter) ? 'active' : '' ?>">All</a>
@@ -407,21 +515,16 @@ function build_vehicle_image_path($value): string {
 </div>
 
 <div class="car-container" id="carContainer">
-
 <?php if (empty($cars)): ?>
     <div class="no-results">
         <h3>No vehicles found in this category.</h3>
         <a href="browse.php" class="blue">View all cars</a>
     </div>
-
 <?php else: ?>
-
-<?php foreach ($cars as $car): ?>
-    <?php renderCarCard($car, $user_id, $conn, $account_state); ?>
-<?php endforeach; ?>
-
+    <?php foreach ($cars as $car): ?>
+        <?php renderCarCard($car, $user_id, $conn, $account_state); ?>
+    <?php endforeach; ?>
 <?php endif; ?>
-
 </div>
 
 <footer>
@@ -430,10 +533,9 @@ function build_vehicle_image_path($value): string {
 
 <script>
 (function () {
-
-    // ==========================
-    // Page Elements
-    // ==========================
+    // ============================================================
+    // PAGE ELEMENTS
+    // ============================================================
     const userId = document.body.dataset.userId;
     const currentStatus = document.body.dataset.currentStatus;
 
@@ -441,18 +543,38 @@ function build_vehicle_image_path($value): string {
     const approvalNote = document.getElementById("renter-approval-note");
     const approvalBannerBadge = document.getElementById("renter-approval-badge");
 
-    const shareBtn = document.getElementById("share-location-btn");
-    const locationStatus = document.getElementById("location-status");
-
     const mobileMenuBtn = document.getElementById("mobileMenuBtn");
     const mobileMenu = document.getElementById("mobileMenu");
 
     const carContainer = document.getElementById("carContainer");
     const currentFilter = new URLSearchParams(window.location.search).get('seater') || 'all';
 
-    // ==========================
-    // IMAGE LAZY LOADING & FALLBACK
-    // ==========================
+    // ============================================================
+    // LOCATION PERMISSION MODAL - IMPROVED
+    // ============================================================
+    const modal = document.getElementById('locationModal');
+    const allowBtn = document.getElementById('modalAllowBtn');
+    const denyBtn = document.getElementById('modalDenyBtn');
+    const modalStatus = document.getElementById('modalStatus');
+    let pendingCarId = null;
+    let isLocationGranted = false;
+    let isTracking = false;
+    let isProcessing = false;
+
+    // ============================================================
+    // UPDATE MODAL STATUS WITH STABLE MESSAGES
+    // ============================================================
+    function setModalStatus(message, type) {
+        modalStatus.textContent = message;
+        modalStatus.className = 'permission-status';
+        if (type) {
+            modalStatus.classList.add(type);
+        }
+    }
+
+    // ============================================================
+    // IMAGE LAZY LOADING
+    // ============================================================
     function handleImageLoad(img) {
         img.classList.remove('loading');
         img.classList.add('loaded');
@@ -461,17 +583,13 @@ function build_vehicle_image_path($value): string {
     function handleImageError(img) {
         img.classList.remove('loading');
         img.classList.add('loaded');
-        // Fallback to default image
         if (!img.src.includes('default-car.svg')) {
             img.src = '../uploads/vehicles/default-car.svg';
         }
     }
 
     document.querySelectorAll('.car-img').forEach(function(img) {
-        // Add loading class for shimmer effect
         img.classList.add('loading');
-        
-        // If image is already loaded (cached), mark as loaded immediately
         if (img.complete) {
             handleImageLoad(img);
         } else {
@@ -480,24 +598,18 @@ function build_vehicle_image_path($value): string {
         }
     });
 
-    // ==========================
-    // AUTO-REFRESH VEHICLE LIST (every 30 seconds)
-    // ==========================
+    // ============================================================
+    // AUTO-REFRESH VEHICLE LIST
+    // ============================================================
     function refreshVehicleList() {
         if (!carContainer) return;
-        
         var filterParam = currentFilter !== 'all' ? '&seater=' + encodeURIComponent(currentFilter) : '';
         var url = 'browse.php?ajax=1&section=vehicle-list' + filterParam;
-        
         fetch(url)
-            .then(function(response) {
-                return response.text();
-            })
+            .then(function(response) { return response.text(); })
             .then(function(html) {
-                // Only update if we got content
                 if (html.trim().length > 0) {
                     carContainer.innerHTML = html;
-                    // Re-apply lazy loading for new images
                     document.querySelectorAll('.car-img').forEach(function(img) {
                         img.classList.add('loading');
                         if (img.complete) {
@@ -507,274 +619,225 @@ function build_vehicle_image_path($value): string {
                             img.addEventListener('error', function() { handleImageError(img); });
                         }
                     });
+                    bindBookNowButtons();
                 }
             })
-            .catch(function(error) {
-                console.log('Auto-refresh failed:', error);
-            });
+            .catch(function(error) { console.log('Auto-refresh failed:', error); });
     }
-
-    // Start auto-refresh every 30 seconds
     setInterval(refreshVehicleList, 30000);
 
-    // ==========================
+    // ============================================================
     // MOBILE MENU
-    // ==========================
+    // ============================================================
     if (mobileMenuBtn && mobileMenu) {
-
         mobileMenuBtn.addEventListener("click", function () {
-
             mobileMenu.classList.toggle("show");
-
-            if (mobileMenu.classList.contains("show")) {
-                mobileMenuBtn.innerHTML = "✖ Close";
-            } else {
-                mobileMenuBtn.innerHTML = "☰ Menu";
-            }
-
+            mobileMenuBtn.innerHTML = mobileMenu.classList.contains("show") ? "✖ Close" : "☰ Menu";
         });
-
         window.addEventListener("resize", function () {
-
             if (window.innerWidth > 768) {
-
                 mobileMenu.classList.remove("show");
                 mobileMenuBtn.innerHTML = "☰ Menu";
-
             }
-
         });
-
     }
 
-    // ==========================
+    // ============================================================
     // ACCOUNT APPROVAL CHECKER
-    // ==========================
+    // ============================================================
     if (userId && statusBadge && currentStatus === "pending") {
-
         const pollInterval = setInterval(function () {
-
             fetch("check_approval_status.php?user_id=" + userId)
                 .then(response => response.json())
                 .then(data => {
-
                     if (data.status === "approved") {
-
                         clearInterval(pollInterval);
                         location.reload();
-
-                    }
-                    else if (data.status === "disapproved") {
-
+                    } else if (data.status === "disapproved") {
                         statusBadge.textContent = "Disapproved";
                         statusBadge.className = "status-badge disapproved";
-
-                        approvalNote.textContent =
-                            data.disapproval_reason ||
-                            "Your account was disapproved.";
-
+                        approvalNote.textContent = data.disapproval_reason || "Your account was disapproved.";
                         if (approvalBannerBadge) {
-
                             approvalBannerBadge.textContent = "Disapproved";
-                            approvalBannerBadge.className =
-                                "status-badge disapproved";
-
+                            approvalBannerBadge.className = "status-badge disapproved";
                         }
-
                     }
-
                 })
-                .catch(function (err) {
-
-                    console.log(err);
-
-                });
-
+                .catch(function (err) { console.log(err); });
         }, 5000);
-
     }
 
-    // ==========================
-    // LIVE LOCATION SHARING (Updated URL)
-    // ==========================
-    if (shareBtn) {
-
-        let trackingTimer = null;
-        let isTracking = false;
-
-        function stopTracking() {
-
-            if (trackingTimer) {
-
-                clearInterval(trackingTimer);
-                trackingTimer = null;
-
-            }
-
-            isTracking = false;
-            shareBtn.disabled = false;
-            shareBtn.textContent = "Share Live Location";
-            locationStatus.textContent = "Live tracking stopped.";
-
-        }
-
-        function sendLocation(position) {
-
-            const payload = new URLSearchParams({
-
-                latitude: position.coords.latitude,
-                longitude: position.coords.longitude,
-                accuracy: position.coords.accuracy || 0,
-                recorded_at: new Date()
-                    .toISOString()
-                    .slice(0,19)
-                    .replace("T"," ")
-
-            });
-
-            // ============================================
-            // UPDATED: Use absolute path to admin folder
-            // ============================================
-            fetch("/admin/location_tracker.php", {
-
-                method: "POST",
-
-                headers: {
-
-                    "Content-Type":
-                        "application/x-www-form-urlencoded"
-
-                },
-
-                body: payload.toString()
-
-            })
-
-            .then(async response => {
-
-                const data =
-                    await response.json().catch(() => ({}));
-
-                if (!response.ok || !data.success) {
-
-                    throw new Error(
-                        data.message ||
-                        "Unable to save location."
-                    );
-
-                }
-
-                locationStatus.textContent =
-                    "Live location is now being shared with admin.";
-
-            })
-
-            .catch(function (error) {
-
-                locationStatus.textContent =
-                    error.message ||
-                    "Unable to share location.";
-
-                stopTracking();
-
-            });
-
-        }
-
-        function startTracking() {
-
-            if (!navigator.geolocation) {
-
-                locationStatus.textContent =
-                    "Geolocation is not supported.";
-
-                return;
-
-            }
-
-            isTracking = true;
-            shareBtn.disabled = true;
-            shareBtn.textContent = "Tracking...";
-            locationStatus.textContent = "Requesting your GPS position...";
-
-            navigator.geolocation.getCurrentPosition(
-
-                function (position) {
-
-                    sendLocation(position);
-
-                    trackingTimer = setInterval(function () {
-
-                        navigator.geolocation.getCurrentPosition(
-
-                            sendLocation,
-
-                            function (error) {
-
-                                let message = "Unable to refresh GPS location.";
-
-                                if (error.code === 1) {
-                                    message = "Location permission denied.";
-                                }
-
-                                locationStatus.textContent = message;
-
-                            },
-
-                            {
-                                enableHighAccuracy: true,
-                                timeout: 15000,
-                                maximumAge: 10000
-                            }
-
-                        );
-
-                    }, 15000);
-
-                },
-
-                function (error) {
-
-                    let message = "Unable to access GPS.";
-
-                    if (error.code === 1) {
-                        message = "Location permission denied.";
-                    }
-                    else if (error.code === 2) {
-                        message = "Location unavailable.";
-                    }
-                    else if (error.code === 3) {
-                        message = "Location request timed out.";
-                    }
-
-                    locationStatus.textContent = message;
-                    shareBtn.disabled = false;
-                    shareBtn.textContent = "Share Live Location";
-
-                },
-
-                {
-                    enableHighAccuracy: true,
-                    timeout: 20000,
-                    maximumAge: 0
-                }
-
-            );
-
-        }
-
-        shareBtn.addEventListener("click", function () {
-
-            if (isTracking) {
-                stopTracking();
-            }
-            else {
-                startTracking();
-            }
-
+    // ============================================================
+    // REAL GPS LOCATION SENDING - WITH BETTER ERROR HANDLING
+    // ============================================================
+    function sendLocationToServer(position) {
+        const payload = new URLSearchParams({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy || 0,
+            recorded_at: new Date().toISOString().slice(0,19).replace("T"," ")
         });
 
+        console.log('📍 Sending location:', payload.toString());
+
+        setModalStatus('⏳ Sending location to server...', 'loading');
+
+        return fetch("../admin/location_tracker.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: payload.toString()
+        })
+        .then(async function(response) {
+            const data = await response.json().catch(() => ({}));
+            console.log('📡 Server response:', data);
+            
+            if (!response.ok || !data.success) {
+                throw new Error(data.message || data.debug || "Server rejected location");
+            }
+            return data;
+        });
     }
+
+    // ============================================================
+    // REAL GPS LOCATION TRACKING - WITH STABLE FEEDBACK
+    // ============================================================
+    function startLocationTracking() {
+        if (isProcessing) return;
+        isProcessing = true;
+
+        if (!navigator.geolocation) {
+            setModalStatus('❌ Geolocation is not supported on this device.', 'error');
+            allowBtn.disabled = false;
+            allowBtn.textContent = 'Try Again';
+            isProcessing = false;
+            return;
+        }
+
+        setModalStatus('📡 Getting your real GPS location...', 'loading');
+        allowBtn.disabled = true;
+        allowBtn.textContent = 'Getting GPS...';
+
+        navigator.geolocation.getCurrentPosition(
+            // SUCCESS
+            function (position) {
+                console.log('✅ GPS acquired:', position.coords.latitude, position.coords.longitude);
+                setModalStatus('📍 GPS acquired! Saving location...', 'loading');
+
+                sendLocationToServer(position)
+                    .then(function(data) {
+                        console.log('✅ Location saved!', data);
+                        isLocationGranted = true;
+                        isTracking = true;
+                        
+                        setModalStatus('✅ Real GPS location saved! Redirecting...', 'success');
+                        
+                        setTimeout(function() {
+                            modal.classList.remove('show');
+                            if (pendingCarId) {
+                                window.location.href = 'book.php?car_id=' + pendingCarId;
+                            }
+                        }, 1200);
+                    })
+                    .catch(function(error) {
+                        console.error('❌ Save failed:', error);
+                        setModalStatus('❌ ' + error.message, 'error');
+                        allowBtn.disabled = false;
+                        allowBtn.textContent = 'Try Again';
+                        isProcessing = false;
+                    });
+            },
+            // ERROR
+            function (error) {
+                console.error('❌ GPS Error:', error);
+                let message = '⚠️ Unable to access GPS. ';
+                if (error.code === 1) {
+                    message = '❌ Location permission denied. You must allow GPS access to book a car.';
+                } else if (error.code === 2) {
+                    message = '⚠️ GPS unavailable. Please check your device GPS and try again.';
+                } else if (error.code === 3) {
+                    message = '⏱️ GPS request timed out. Please try again.';
+                }
+                setModalStatus(message, 'error');
+                allowBtn.disabled = false;
+                allowBtn.textContent = 'Try Again';
+                isProcessing = false;
+            },
+            // OPTIONS
+            { 
+                enableHighAccuracy: true, 
+                timeout: 30000, 
+                maximumAge: 5000 
+            }
+        );
+    }
+
+    // ============================================================
+    // BOOK NOW HANDLER
+    // ============================================================
+    function handleBookNow(carId) {
+        pendingCarId = carId;
+        
+        if (isLocationGranted && isTracking) {
+            window.location.href = 'book.php?car_id=' + carId;
+            return;
+        }
+
+        // Reset modal state
+        isProcessing = false;
+        allowBtn.disabled = false;
+        allowBtn.textContent = 'Allow Location';
+        setModalStatus('Please allow location access to continue booking.', '');
+        
+        modal.classList.add('show');
+        
+        // Remove old event listeners by cloning buttons
+        const newAllowBtn = allowBtn.cloneNode(true);
+        const newDenyBtn = denyBtn.cloneNode(true);
+        allowBtn.parentNode.replaceChild(newAllowBtn, allowBtn);
+        denyBtn.parentNode.replaceChild(newDenyBtn, denyBtn);
+        
+        // Update references
+        const updatedAllowBtn = document.getElementById('modalAllowBtn');
+        const updatedDenyBtn = document.getElementById('modalDenyBtn');
+        
+        updatedAllowBtn.onclick = function() {
+            startLocationTracking();
+        };
+        
+        updatedDenyBtn.onclick = function() {
+            setModalStatus('❌ GPS permission denied. Booking cannot continue.', 'error');
+            pendingCarId = null;
+            updatedAllowBtn.disabled = false;
+            updatedAllowBtn.textContent = 'Try Again';
+        };
+    }
+
+    // ============================================================
+    // BIND BOOK NOW BUTTONS
+    // ============================================================
+    function bindBookNowButtons() {
+        document.querySelectorAll('.book-now-btn').forEach(function(btn) {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                var carId = this.dataset.carId;
+                if (carId) {
+                    handleBookNow(carId);
+                }
+            });
+        });
+    }
+
+    bindBookNowButtons();
+
+    // Close modal on outside click only if not processing
+    modal.addEventListener('click', function(e) {
+        if (e.target === this && !isProcessing) {
+            // Don't close if error is shown - user must choose
+            if (!modalStatus.classList.contains('error')) {
+                // Only close if no pending action
+            }
+        }
+    });
 
 })();
 </script>

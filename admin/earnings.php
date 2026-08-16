@@ -107,7 +107,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $payment = $stmt->fetch();
             
             if ($payment) {
-                $stmt = $pdo->prepare("UPDATE bookings SET status = 'confirmed' WHERE id = ?");
+                $stmt = $pdo->prepare("UPDATE bookings SET status = 'approved' WHERE id = ?");
                 $stmt->execute([$payment['booking_id']]);
             }
             
@@ -123,15 +123,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $reason = $_POST['reason'] ?? 'No reason provided';
             
-            $stmt = $pdo->prepare("UPDATE payments SET status = 'disapproved', feedback = ? WHERE id = ?");
-            $stmt->execute([$reason, $payment_id]);
+            $stmt = $pdo->prepare("UPDATE payments SET status = 'disapproved' WHERE id = ?");
+            $stmt->execute([$payment_id]);
             
             $stmt = $pdo->prepare("SELECT booking_id FROM payments WHERE id = ?");
             $stmt->execute([$payment_id]);
             $payment = $stmt->fetch();
             
             if ($payment) {
-                $stmt = $pdo->prepare("UPDATE bookings SET status = 'cancelled' WHERE id = ?");
+                $stmt = $pdo->prepare("UPDATE bookings SET status = 'disapproved' WHERE id = ?");
                 $stmt->execute([$payment['booking_id']]);
             }
             
@@ -183,7 +183,9 @@ try {
         $chartData[] = (float) $row['revenue'];
     }
 
-    // Get pending payments
+    // ============================================================
+    // FIXED: Get pending payments - changed b.user_id to b.renter_id
+    // ============================================================
     $stmt3 = $pdo->query("
         SELECT 
             p.id AS payment_id,
@@ -202,7 +204,7 @@ try {
             v.name AS vehicle_name
         FROM payments p
         JOIN bookings b ON p.booking_id = b.id
-        JOIN users u1 ON b.user_id = u1.id
+        JOIN users u1 ON b.renter_id = u1.id
         JOIN vehicles v ON b.vehicle_id = v.id
         JOIN users u2 ON v.owner_id = u2.id
         WHERE p.status = 'pending'
@@ -210,7 +212,9 @@ try {
     ");
     $pending_payments = $stmt3->fetchAll();
 
-    // Get all payments for history
+    // ============================================================
+    // FIXED: Get all payments for history - changed b.user_id to b.renter_id
+    // ============================================================
     $stmt4 = $pdo->query("
         SELECT 
             p.id AS payment_id,
@@ -224,7 +228,7 @@ try {
             v.name AS vehicle_name
         FROM payments p
         JOIN bookings b ON p.booking_id = b.id
-        JOIN users u1 ON b.user_id = u1.id
+        JOIN users u1 ON b.renter_id = u1.id
         JOIN vehicles v ON b.vehicle_id = v.id
         JOIN users u2 ON v.owner_id = u2.id
         WHERE p.status != 'pending'

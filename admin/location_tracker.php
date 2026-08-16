@@ -1,48 +1,43 @@
 <?php
-// ============================================
-// FIX: Ensure admin_auth.php loads correctly
-// ============================================
+// ============================================================
+// Admin Authentication & Database Connection
+// ============================================================
 require_once __DIR__ . '/admin_auth.php';
 
-// ============================================
-// FIX: Make sure $pdo is available
-// ============================================
+// Get database connection
 $pdo = $GLOBALS['pdo'] ?? null;
 
-// If still not available, try to load db.php directly
+// If connection failed, return safe error
 if (!$pdo) {
-    require_once __DIR__ . '/../database/db.php';
-    $pdo = $GLOBALS['pdo'] ?? null;
-}
-
-// If STILL not available, try to connect directly
-if (!$pdo) {
-    try {
-        // InfinityFree database credentials
-        $host = 'sql207.infinityfree.com';
-        $dbname = 'if0_42554417_carbnb';
-        $username = 'if0_42554417';
-        $password = 'YOUR_DATABASE_PASSWORD_HERE'; // ← CHANGE THIS
-        $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $username, $password);
-        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-        $GLOBALS['pdo'] = $pdo;
-    } catch (PDOException $e) {
-        // Connection failed
+    error_log('location_tracker.php: Database connection failed');
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' || isset($_GET['ajax'])) {
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success' => false,
+            'message' => 'Database connection failed. Please check your configuration.'
+        ]);
+        exit;
     }
+    die('Database connection error. Please contact administrator.');
 }
 
-// ============================================
-// API ROUTER - Handles both GET and POST
-// ============================================
+// ============================================================
+// API ROUTER
+// ============================================================
 $ajax = isset($_GET['ajax']) && $_GET['ajax'] === '1';
 
-// --- POST: Renter sends location ---
+// ============================================================
+// POST: Renter sends REAL GPS location
+// ============================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$ajax) {
     header('Content-Type: application/json');
     
     // Check if user is logged in
     if (!isset($_SESSION['user_id'])) {
-        echo json_encode(['success' => false, 'message' => 'Unauthorized. Please log in.']);
+        echo json_encode([
+            'success' => false,
+            'message' => 'Not logged in. Please log in first.'
+        ]);
         exit;
     }
     
@@ -54,64 +49,149 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$ajax) {
     
     // Validate coordinates
     if ($latitude === null || $longitude === null) {
-        echo json_encode(['success' => false, 'message' => 'Missing latitude or longitude']);
+        echo json_encode([
+            'success' => false,
+            'message' => 'Missing latitude or longitude'
+        ]);
         exit;
     }
     
     if ($latitude < -90 || $latitude > 90 || $longitude < -180 || $longitude > 180) {
-        echo json_encode(['success' => false, 'message' => 'Invalid coordinates']);
+        echo json_encode([
+            'success' => false,
+            'message' => 'Invalid coordinates'
+        ]);
         exit;
     }
     
     try {
-        if (!$pdo) {
-            throw new Exception('Database connection not available');
+        // Check if location_tracker table exists
+        $stmt = $pdo->query("SHOW TABLES LIKE 'location_tracker'");
+        if ($stmt->rowCount() == 0) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Location tracker table not found. Please run database setup.'
+            ]);
+            exit;
         }
         
-        // Insert location
+        // Check if user exists and is active
+        $stmt = $pdo->prepare("SELECT id, full_name FROM users WHERE id = ? AND is_deleted = 0");
+        $stmt->execute([$user_id]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$user) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'User not found or account is deleted.'
+            ]);
+            exit;
+        }
+        
+        // Check if user already has a location in last 30 minutes
+        $stmt = $pdo->prepare("
+            SELECT COUNT(*) 
+            FROM location_tracker 
+            WHERE user_id = ? AND recorded_at > DATE_SUB(NOW(), INTERVAL 30 MINUTE)
+        ");
+        $stmt->execute([$user_id]);
+        $existingLocations = (int) $stmt->fetchColumn();
+        
+        $isFirstLocation = ($existingLocations === 0);
+        
+        // Insert the GPS location
         $stmt = $pdo->prepare("
             INSERT INTO location_tracker (user_id, latitude, longitude, accuracy, recorded_at)
             VALUES (?, ?, ?, ?, ?)
         ");
         $stmt->execute([$user_id, $latitude, $longitude, $accuracy, $recorded_at]);
+        $insertId = $pdo->lastInsertId();
+        
+        // Log successful save
+        error_log("GPS Location saved: ID=$insertId, User=$user_id, Lat=$latitude, Lng=$longitude");
+        
+        // Create notification only on first location
+        if ($isFirstLocation && $insertId > 0) {
+            $userName = $user['full_name'] ?? 'Renter #' . $user_id;
+            
+            // Check if notification table exists
+            $stmt = $pdo->query("SHOW TABLES LIKE 'admin_notifications'");
+            if ($stmt->rowCount() > 0) {
+                // Check for recent notification (last 5 minutes)
+                $stmt = $pdo->prepare("
+                    SELECT COUNT(*) 
+                    FROM admin_notifications 
+                    WHERE notification_type = 'location_permission_granted' 
+                    AND user_id = ? 
+                    AND created_at > DATE_SUB(NOW(), INTERVAL 5 MINUTE)
+                ");
+                $stmt->execute([$user_id]);
+                $recentNotification = (int) $stmt->fetchColumn();
+                
+                if ($recentNotification === 0) {
+                    $message = "Renter {$userName} has allowed location access and their current location is now available.";
+                    $stmt = $pdo->prepare("
+                        INSERT INTO admin_notifications 
+                        (notification_type, title, message, user_id, is_read, created_at)
+                        VALUES ('location_permission_granted', '📍 Location Permission Granted', ?, ?, 0, NOW())
+                    ");
+                    $stmt->execute([$message, $user_id]);
+                    error_log("Notification created for user: $user_id");
+                }
+            }
+        }
         
         // Clean up old records (older than 1 hour)
         $stmt = $pdo->prepare("DELETE FROM location_tracker WHERE recorded_at < DATE_SUB(NOW(), INTERVAL 1 HOUR)");
         $stmt->execute();
         
         echo json_encode([
-            'success' => true, 
-            'message' => 'Location saved successfully',
-            'user_id' => $user_id
+            'success' => true,
+            'message' => 'GPS location saved successfully!',
+            'user_id' => $user_id,
+            'user_name' => $user['full_name'],
+            'is_first' => $isFirstLocation,
+            'latitude' => $latitude,
+            'longitude' => $longitude,
+            'recorded_at' => $recorded_at,
+            'insert_id' => $insertId
+        ]);
+        
+    } catch (PDOException $e) {
+        error_log('location_tracker.php PDO Error: ' . $e->getMessage());
+        echo json_encode([
+            'success' => false,
+            'message' => 'Database error: ' . $e->getMessage()
         ]);
     } catch (Exception $e) {
-        echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
+        error_log('location_tracker.php Error: ' . $e->getMessage());
+        echo json_encode([
+            'success' => false,
+            'message' => 'Error: ' . $e->getMessage()
+        ]);
     }
     exit;
 }
 
-// --- GET: Admin fetches locations ---
+// ============================================================
+// GET: Admin fetches locations for map
+// ============================================================
 if ($ajax && ($_GET['section'] ?? '') === 'locations') {
     header('Content-Type: application/json');
     
     try {
-        if (!$pdo) {
-            echo json_encode(['success' => false, 'message' => 'Database connection not available', 'points' => []]);
-            exit;
-        }
-        
         // Check if table exists
         $stmt = $pdo->query("SHOW TABLES LIKE 'location_tracker'");
         if ($stmt->rowCount() == 0) {
             echo json_encode([
-                'success' => true, 
+                'success' => true,
                 'message' => 'No locations found yet',
                 'points' => []
             ]);
             exit;
         }
         
-        // Get locations from the last 30 minutes
+        // Get locations from last 30 minutes
         $stmt = $pdo->prepare("
             SELECT 
                 lt.id,
@@ -124,8 +204,8 @@ if ($ajax && ($_GET['section'] ?? '') === 'locations') {
             FROM location_tracker lt
             LEFT JOIN users u ON lt.user_id = u.id
             WHERE lt.recorded_at > DATE_SUB(NOW(), INTERVAL 30 MINUTE)
-            AND u.is_deleted = 0
-            ORDER BY lt.recorded_at ASC
+            AND (u.is_deleted = 0 OR u.is_deleted IS NULL)
+            ORDER BY lt.recorded_at DESC
         ");
         $stmt->execute();
         $points = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -134,17 +214,139 @@ if ($ajax && ($_GET['section'] ?? '') === 'locations') {
             'success' => true,
             'points' => $points,
             'count' => count($points),
-            'message' => count($points) . ' location(s) found'
+            'message' => count($points) . ' location(s) found',
+            'server_time' => date('Y-m-d H:i:s')
         ]);
-    } catch (PDOException $e) {
+        
+    } catch (Exception $e) {
+        error_log('location_tracker.php GET locations error: ' . $e->getMessage());
         echo json_encode([
-            'success' => false, 
-            'message' => 'Database error: ' . $e->getMessage(),
+            'success' => false,
+            'message' => 'Unable to load locations',
             'points' => []
         ]);
     }
     exit;
 }
+
+// ============================================================
+// GET: Debug endpoint - Check raw locations
+// ============================================================
+if ($ajax && ($_GET['section'] ?? '') === 'debug') {
+    header('Content-Type: application/json');
+    try {
+        // Check if table exists
+        $stmt = $pdo->query("SHOW TABLES LIKE 'location_tracker'");
+        $tableExists = $stmt->rowCount() > 0;
+        
+        $points = [];
+        if ($tableExists) {
+            $stmt = $pdo->query("
+                SELECT 
+                    lt.id,
+                    lt.user_id,
+                    lt.latitude,
+                    lt.longitude,
+                    lt.accuracy,
+                    lt.recorded_at,
+                    lt.created_at,
+                    u.full_name,
+                    u.is_deleted
+                FROM location_tracker lt
+                LEFT JOIN users u ON lt.user_id = u.id
+                ORDER BY lt.created_at DESC
+                LIMIT 20
+            ");
+            $points = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+        
+        // Get server info
+        $stmt = $pdo->query("SELECT NOW() AS server_time");
+        $serverInfo = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        // Count users
+        $stmt = $pdo->query("SELECT COUNT(*) as user_count FROM users WHERE is_deleted = 0");
+        $userCount = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        echo json_encode([
+            'success' => true,
+            'table_exists' => $tableExists,
+            'server_time' => $serverInfo['server_time'] ?? 'unknown',
+            'total_users' => (int) ($userCount['user_count'] ?? 0),
+            'total_locations' => count($points),
+            'points' => $points
+        ]);
+        
+    } catch (Exception $e) {
+        echo json_encode([
+            'success' => false,
+            'error' => $e->getMessage()
+        ]);
+    }
+    exit;
+}
+
+// ============================================================
+// GET: Unread notification count
+// ============================================================
+if ($ajax && ($_GET['section'] ?? '') === 'notification-count') {
+    header('Content-Type: application/json');
+    try {
+        $stmt = $pdo->query("SELECT COUNT(*) FROM admin_notifications WHERE is_read = 0");
+        $count = (int) $stmt->fetchColumn();
+        echo json_encode(['success' => true, 'count' => $count]);
+    } catch (Exception $e) {
+        error_log('location_tracker.php notification-count error: ' . $e->getMessage());
+        echo json_encode(['success' => false, 'count' => 0]);
+    }
+    exit;
+}
+
+// ============================================================
+// GET: Notification list
+// ============================================================
+if ($ajax && ($_GET['section'] ?? '') === 'notifications') {
+    header('Content-Type: application/json');
+    try {
+        $stmt = $pdo->query("
+            SELECT n.id, n.notification_type, n.title, n.message, n.user_id, n.booking_id, n.is_read, n.created_at,
+                   u.full_name as user_name
+            FROM admin_notifications n
+            LEFT JOIN users u ON n.user_id = u.id
+            ORDER BY n.created_at DESC 
+            LIMIT 20
+        ");
+        $notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        echo json_encode(['success' => true, 'notifications' => $notifications]);
+    } catch (Exception $e) {
+        error_log('location_tracker.php notifications error: ' . $e->getMessage());
+        echo json_encode(['success' => false, 'notifications' => []]);
+    }
+    exit;
+}
+
+// ============================================================
+// POST: Mark notification as read
+// ============================================================
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'mark_read') {
+    header('Content-Type: application/json');
+    try {
+        $id = isset($_POST['notification_id']) ? (int) $_POST['notification_id'] : 0;
+        if ($id > 0) {
+            $stmt = $pdo->prepare("UPDATE admin_notifications SET is_read = 1 WHERE id = ?");
+            $stmt->execute([$id]);
+        }
+        echo json_encode(['success' => true]);
+    } catch (Exception $e) {
+        error_log('location_tracker.php mark_read error: ' . $e->getMessage());
+        echo json_encode(['success' => false]);
+    }
+    exit;
+}
+
+// ============================================================
+// HTML: Admin Map Page
+// ============================================================
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -224,6 +426,11 @@ if ($ajax && ($_GET['section'] ?? '') === 'locations') {
       to { transform: rotate(360deg); }
     }
     
+    body.sidebar-open .leaflet-control-zoom,
+    body.sidebar-open .leaflet-control-attribution {
+      display: none !important;
+    }
+    
     @media (max-width: 767px) {
       #tracker-map { height: 320px; }
     }
@@ -268,7 +475,6 @@ if ($ajax && ($_GET['section'] ?? '') === 'locations') {
         </div>
       </section>
 
-      <!-- Error message container -->
       <div id="trackerError" class="tracker-error">
         <strong>⚠️ Unable to load location data</strong>
         <p id="errorMessage">Please check your connection and try again.</p>
@@ -293,9 +499,9 @@ if ($ajax && ($_GET['section'] ?? '') === 'locations') {
           crossorigin=""></script>
   
   <script>
-    // ============================
-    // Configuration
-    // ============================
+    // ============================================================
+    // CONFIGURATION
+    // ============================================================
     const REFRESH_INTERVAL = 10000;
     let map = null;
     let markers = [];
@@ -303,17 +509,17 @@ if ($ajax && ($_GET['section'] ?? '') === 'locations') {
     let refreshTimer = null;
     let isFirstLoad = true;
 
-    // ============================
-    // DOM Elements
-    // ============================
+    // ============================================================
+    // DOM ELEMENTS
+    // ============================================================
     const mapEl = document.getElementById('tracker-map');
     const statusEl = document.getElementById('trackerStatus');
     const errorEl = document.getElementById('trackerError');
     const errorMsgEl = document.getElementById('errorMessage');
 
-    // ============================
-    // SIDEBAR TOGGLE - FIXED
-    // ============================
+    // ============================================================
+    // SIDEBAR TOGGLE
+    // ============================================================
     document.addEventListener('DOMContentLoaded', function () {
       const sidebar = document.querySelector('.sidebar');
       const overlay = document.querySelector('.overlay');
@@ -380,9 +586,9 @@ if ($ajax && ($_GET['section'] ?? '') === 'locations') {
       });
     });
 
-    // ============================
-    // Error Handling
-    // ============================
+    // ============================================================
+    // ERROR HANDLING
+    // ============================================================
     function showError(message) {
       errorMsgEl.textContent = message;
       errorEl.classList.add('show');
@@ -394,7 +600,7 @@ if ($ajax && ($_GET['section'] ?? '') === 'locations') {
       errorEl.classList.remove('show');
     }
 
-    function setStatus(message, type = 'info', count = 0) {
+    function setStatus(message, type, count) {
       statusEl.className = 'tracker-status';
       if (type === 'error') statusEl.classList.add('error');
       else if (type === 'success') statusEl.classList.add('success');
@@ -406,9 +612,9 @@ if ($ajax && ($_GET['section'] ?? '') === 'locations') {
       }
     }
 
-    // ============================
-    // Map
-    // ============================
+    // ============================================================
+    // MAP FUNCTIONS
+    // ============================================================
     function initMap() {
       try {
         if (typeof L === 'undefined') {
@@ -498,9 +704,9 @@ if ($ajax && ($_GET['section'] ?? '') === 'locations') {
       hideError();
     }
 
-    // ============================
-    // Fetch Locations (GET API)
-    // ============================
+    // ============================================================
+    // FETCH LOCATIONS
+    // ============================================================
     function refreshLocations() {
       if (isFirstLoad) setStatus('🔄 Loading latest positions...', 'info');
 
@@ -529,9 +735,9 @@ if ($ajax && ($_GET['section'] ?? '') === 'locations') {
         });
     }
 
-    // ============================
-    // Initialize
-    // ============================
+    // ============================================================
+    // INITIALIZE
+    // ============================================================
     function initialize() {
       if (typeof L === 'undefined') {
         showError('Map library failed to load. Please refresh the page.');

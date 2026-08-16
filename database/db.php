@@ -72,6 +72,7 @@ try {
     $GLOBALS['conn'] = $pdo;
     $conn = $pdo;
 
+    // Ensure columns exist
     ensure_column($pdo, 'users', 'face_descriptor', 'TEXT NULL');
     ensure_column($pdo, 'vehicles', 'availability_status', "ENUM('available','rented','maintenance') DEFAULT 'available'");
     ensure_column($pdo, 'vehicles', 'approval_status', "ENUM('pending','approved','disapproved') DEFAULT 'pending'");
@@ -81,17 +82,26 @@ try {
     ensure_column($pdo, 'payments', 'transaction_reference', 'VARCHAR(100) NULL');
     ensure_column($pdo, 'payments', 'gateway_response', 'TEXT NULL');
     ensure_column($pdo, 'payments', 'paid_at', 'DATETIME NULL');
+    
+    // ============================================================
+    // FIXED: Changed 'renter_locations' to 'location_tracker'
+    // This matches what location_tracker.php expects
+    // ============================================================
     ensure_table(
         $pdo,
-        'renter_locations',
+        'location_tracker',
         "id INT AUTO_INCREMENT PRIMARY KEY,
         user_id INT NOT NULL,
+        booking_id INT NULL,
         latitude DECIMAL(10,8) NOT NULL,
         longitude DECIMAL(11,8) NOT NULL,
         accuracy DECIMAL(10,2) NULL,
         recorded_at DATETIME NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE"
+        INDEX idx_location_user_id (user_id),
+        INDEX idx_location_booking_id (booking_id),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE SET NULL"
     );
 
 } catch (PDOException $e) {

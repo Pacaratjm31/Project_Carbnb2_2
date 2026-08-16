@@ -121,6 +121,14 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        // Lets you plug the phone into a PC and inspect the app's WebView
+        // console directly from desktop Chrome (chrome://inspect) - the
+        // standard way to see the REAL JavaScript error behind something
+        // that works in a normal browser but silently fails inside the
+        // app. Safe to leave on; it does nothing unless someone manually
+        // opens chrome://inspect while the phone is plugged in.
+        WebView.setWebContentsDebuggingEnabled(true);
+
         webView = this.bridge.getWebView();
 
         registerNetworkCallback();
