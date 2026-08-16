@@ -1,54 +1,42 @@
-document.addEventListener("DOMContentLoaded", async () => {
+document.addEventListener(
+    "DOMContentLoaded",
+    async () => {
 
-    const video = document.getElementById("video");
-    const captureBtn = document.getElementById("captureBtn");
-    const statusMessage = document.getElementById("statusMessage");
-    const faceImageInput = document.getElementById("faceImage");
-    const faceEncodingInput = document.getElementById("faceEncoding");
-    const faceForm = document.getElementById("faceForm");
+    const video =
+        document.getElementById("video");
+
+    const captureBtn =
+        document.getElementById("captureBtn");
+
+    const statusMessage =
+        document.getElementById("statusMessage");
+
+    const faceImageInput =
+        document.getElementById("faceImage");
+
+    const faceEncodingInput =
+        document.getElementById("faceEncoding");
+
+    const faceForm =
+        document.getElementById("faceForm");
 
     let isCapturing = false;
-    let modelsReady = false;
-    let cameraReady = false;
-    let detectionStarted = false;
 
-    // --- Camera opens immediately, in parallel with model loading -----
-    // Previously the camera only opened AFTER all 3 models finished
-    // loading. If model loading was slow or stuck, the camera never
-    // even started - the video area stayed blank the whole time. Now
-    // both start at the same time, so the live camera feed shows up
-    // right away regardless of how long model loading takes.
+    // Start the camera right away, in parallel with model loading below,
+    // instead of waiting for models to finish first. This is what makes
+    // the camera preview open immediately after permission is granted.
     startCamera();
-    loadModelsWithRetry();
 
-    async function startCamera() {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: {
-                    width: 1280,
-                    height: 720,
-                    facingMode: "user"
-                }
-            });
+    try {
 
-            video.srcObject = stream;
-            cameraReady = true;
-            updateStatus();
+        statusMessage.textContent =
+            "Loading face models...";
 
-        } catch (error) {
-            console.error(error);
-            statusMessage.textContent = "Unable to access camera.";
-        }
-    }
-
-    async function loadFaceModelsOnce() {
-        // BUG FIX: face-api.js runs on TensorFlow.js, which by default
-        // tries to use a WebGL backend. Many Android WebView environments
-        // don't support WebGL the way a full mobile browser does, which
-        // causes model loading to hang forever with no error - showing
-        // exactly what you saw: stuck on "Loading face models..."
-        // forever, camera never opening. Forcing the CPU backend avoids
-        // WebGL entirely. It's a little slower per frame, but reliable.
+        // Force the CPU backend before loading models. TensorFlow.js
+        // (which face-api.js runs on) defaults to a WebGL backend that
+        // can hang forever with no error inside Android WebView - this
+        // was the actual cause of getting stuck on "Loading face
+        // models..." with the camera never opening.
         if (window.faceapi && faceapi.tf && faceapi.tf.setBackend) {
             try {
                 await faceapi.tf.setBackend("cpu");
@@ -58,184 +46,224 @@ document.addEventListener("DOMContentLoaded", async () => {
             }
         }
 
-        await faceapi.nets.tinyFaceDetector.loadFromUri(
-            "../face-api.js-models-master/tiny_face_detector"
-        );
+        await faceapi.nets.tinyFaceDetector
+            .loadFromUri(
+                "../face-api.js-models-master/tiny_face_detector"
+            );
 
-        await faceapi.nets.faceLandmark68Net.loadFromUri(
-            "../face-api.js-models-master/face_landmark_68"
-        );
+        await faceapi.nets.faceLandmark68Net
+            .loadFromUri(
+                "../face-api.js-models-master/face_landmark_68"
+            );
 
-        await faceapi.nets.faceRecognitionNet.loadFromUri(
-            "../face-api.js-models-master/face_recognition"
-        );
+        await faceapi.nets.faceRecognitionNet
+            .loadFromUri(
+                "../face-api.js-models-master/face_recognition"
+            );
+
+        statusMessage.textContent =
+            "Models loaded successfully.";
+
+    } catch (error) {
+
+        console.error(error);
+
+        statusMessage.textContent =
+            "Failed to load face models.";
     }
 
-    function withTimeout(promise, ms) {
-        return Promise.race([
-            promise,
-            new Promise((_, reject) =>
-                setTimeout(() => reject(new Error("Model loading timed out")), ms)
-            )
-        ]);
-    }
-
-    async function loadModelsWithRetry() {
-        removeRetryButton();
-        statusMessage.textContent = "Loading face detection models...";
+    async function startCamera() {
 
         try {
-            // 20 second cap - long enough for a slow connection, short
-            // enough that the user isn't stuck staring at a frozen
-            // screen with no way forward.
-            await withTimeout(loadFaceModelsOnce(), 20000);
-            modelsReady = true;
-            updateStatus();
+
+            const stream =
+                await navigator.mediaDevices
+                    .getUserMedia({
+                        video: {
+                            width: 1280,
+                            height: 720,
+                            facingMode: "user"
+                        }
+                    });
+
+            video.srcObject = stream;
 
         } catch (error) {
+
             console.error(error);
-            showRetryButton("Taking longer than expected. Tap Retry to try again.");
+
+            statusMessage.textContent =
+                "Unable to access camera.";
         }
     }
 
-    function showRetryButton(message) {
-        statusMessage.textContent = message;
+    video.addEventListener(
+        "playing",
+        () => {
 
-        let retryBtn = document.getElementById("modelRetryBtn");
-        if (retryBtn) {
-            return;
-        }
+        setInterval(
+            async () => {
 
-        retryBtn = document.createElement("button");
-        retryBtn.id = "modelRetryBtn";
-        retryBtn.type = "button";
-        retryBtn.textContent = "Retry";
-        retryBtn.style.marginTop = "10px";
-        retryBtn.style.display = "block";
-
-        statusMessage.insertAdjacentElement("afterend", retryBtn);
-
-        retryBtn.addEventListener("click", () => {
-            loadModelsWithRetry();
-        });
-    }
-
-    function removeRetryButton() {
-        const retryBtn = document.getElementById("modelRetryBtn");
-        if (retryBtn) {
-            retryBtn.remove();
-        }
-    }
-
-    function updateStatus() {
-        if (modelsReady && cameraReady && !detectionStarted) {
-            statusMessage.textContent = "Position your face in the frame.";
-        } else if (modelsReady && !cameraReady) {
-            statusMessage.textContent = "Waiting for camera access...";
-        } else if (!modelsReady && cameraReady) {
-            statusMessage.textContent = "Camera ready. Loading face detection...";
-        }
-    }
-
-    video.addEventListener("playing", () => {
-        if (detectionStarted) {
-            return;
-        }
-        detectionStarted = true;
-
-        setInterval(async () => {
-
-            if (!modelsReady) {
-                return;
-            }
-
-            const detection = await faceapi
-                .detectSingleFace(
-                    video,
-                    new faceapi.TinyFaceDetectorOptions({
-                        inputSize: 416,
-                        scoreThreshold: 0.4
-                    })
-                )
-                .withFaceLandmarks();
+            const detection =
+                await faceapi
+                    .detectSingleFace(
+                        video,
+                        new faceapi
+                            .TinyFaceDetectorOptions({
+                                inputSize: 416,
+                                scoreThreshold: 0.4
+                            })
+                    )
+                    .withFaceLandmarks();
 
             if (!detection) {
+
                 captureBtn.disabled = true;
-                statusMessage.textContent = "No face detected.";
+
+                statusMessage.textContent =
+                    "No face detected.";
+
                 return;
             }
 
-            const box = detection.detection.box;
-            const faceWidth = box.width;
-            const faceHeight = box.height;
+            const box =
+                detection.detection.box;
 
-            if (faceWidth < 80 || faceHeight < 80) {
+            const faceWidth =
+                box.width;
+
+            const faceHeight =
+                box.height;
+
+            if (
+                faceWidth < 80 ||
+                faceHeight < 80
+            ) {
+
                 captureBtn.disabled = true;
-                statusMessage.textContent = "Move closer to the camera.";
+
+                statusMessage.textContent =
+                    "Move closer to the camera.";
+
                 return;
             }
 
-            const landmarks = detection.landmarks;
-            const leftEye = landmarks.getLeftEye();
-            const rightEye = landmarks.getRightEye();
+            const landmarks =
+                detection.landmarks;
 
-            if (leftEye.length === 0 || rightEye.length === 0) {
+            const leftEye =
+                landmarks.getLeftEye();
+
+            const rightEye =
+                landmarks.getRightEye();
+
+            if (
+                leftEye.length === 0 ||
+                rightEye.length === 0
+            ) {
+
                 captureBtn.disabled = true;
-                statusMessage.textContent = "Remove cap or glasses.";
+
+                statusMessage.textContent =
+                    "Remove cap or glasses.";
+
                 return;
             }
 
             captureBtn.disabled = false;
-            statusMessage.textContent = "Face detected. Ready to capture.";
+
+            statusMessage.textContent =
+                "Face detected. Ready to capture.";
 
         }, 500);
+
     });
 
-    captureBtn.addEventListener("click", async () => {
+    captureBtn.addEventListener(
+        "click",
+        async () => {
 
-        if (isCapturing) {
-            return;
-        }
+        if (isCapturing) return;
         isCapturing = true;
 
         captureBtn.disabled = true;
-        statusMessage.textContent = "Capturing face...";
 
-        const detection = await faceapi
-            .detectSingleFace(
-                video,
-                new faceapi.TinyFaceDetectorOptions({
-                    inputSize: 416,
-                    scoreThreshold: 0.4
-                })
-            )
-            .withFaceLandmarks()
-            .withFaceDescriptor();
+        statusMessage.textContent =
+            "Capturing face...";
+
+        const detection =
+            await faceapi
+                .detectSingleFace(
+                    video,
+                    new faceapi
+                        .TinyFaceDetectorOptions({
+                            inputSize: 416,
+                            scoreThreshold: 0.4
+                        })
+                )
+                .withFaceLandmarks()
+                .withFaceDescriptor();
 
         if (!detection) {
+
             captureBtn.disabled = false;
-            statusMessage.textContent = "Face capture failed.";
+
+            statusMessage.textContent =
+                "Face capture failed.";
+
             isCapturing = false;
+
             return;
         }
 
-        const canvas = document.createElement("canvas");
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
+        const canvas =
+            document.createElement(
+                "canvas"
+            );
 
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        canvas.width =
+            video.videoWidth;
 
-        const imageData = canvas.toDataURL("image/png");
-        const descriptor = Array.from(detection.descriptor);
+        canvas.height =
+            video.videoHeight;
 
-        faceImageInput.value = imageData;
-        faceEncodingInput.value = JSON.stringify(descriptor);
+        const ctx =
+            canvas.getContext("2d");
 
-        statusMessage.textContent = "Face captured successfully. Saving...";
+        ctx.drawImage(
+            video,
+            0,
+            0,
+            canvas.width,
+            canvas.height
+        );
 
-        setTimeout(() => {
+        const imageData =
+            canvas.toDataURL(
+                "image/png"
+            );
+
+        const descriptor =
+            Array.from(
+                detection.descriptor
+            );
+
+        faceImageInput.value =
+            imageData;
+
+        faceEncodingInput.value =
+            JSON.stringify(
+                descriptor
+            );
+
+        statusMessage.textContent =
+            "Face captured successfully. Saving...";
+
+        setTimeout(
+            () => {
+
             faceForm.submit();
+
         }, 1000);
 
     });
