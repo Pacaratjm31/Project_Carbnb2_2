@@ -305,7 +305,7 @@ $registeredFaceDescriptor = json_decode($user['face_descriptor'], true);
 </div>
 
 <script src="../face-api.js-master/dist/face-api.min.js"></script>
-<script src="script_verify.js"></script>
+<script src="script_verify.js?v=20260816"></script>
 
 <script>
 window.registeredFaceDescriptor = <?php echo json_encode($registeredFaceDescriptor ?: []); ?>;
