@@ -204,16 +204,20 @@ public class MainActivity extends BridgeActivity {
                 // the same folder browser used across almost every
                 // Android device/brand, unlike ACTION_GET_CONTENT which
                 // can resolve to a Share sheet on some OEM Android skins.
+                //
+                // BUG FIX: previously restricted selectable files using
+                // fileChooserParams.getAcceptTypes() via EXTRA_MIME_TYPES.
+                // Some HTML file inputs specify "accept" using file
+                // extensions (e.g. ".jpg,.png") rather than proper MIME
+                // types (e.g. "image/*") - Android's system picker expects
+                // real MIME types there, and silently hides/blocks files
+                // that don't match cleanly. Since the underlying HTML form
+                // already accepts a wide range of document/image types,
+                // it's safer and more reliable to let the user pick ANY
+                // file here rather than risk incorrectly hiding valid ones.
                 Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
                 intent.addCategory(Intent.CATEGORY_OPENABLE);
                 intent.setType("*/*");
-
-                String[] acceptTypes = fileChooserParams.getAcceptTypes();
-                if (acceptTypes != null
-                        && acceptTypes.length > 0
-                        && !(acceptTypes.length == 1 && acceptTypes[0].isEmpty())) {
-                    intent.putExtra(Intent.EXTRA_MIME_TYPES, acceptTypes);
-                }
 
                 if (fileChooserParams.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE) {
                     intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
