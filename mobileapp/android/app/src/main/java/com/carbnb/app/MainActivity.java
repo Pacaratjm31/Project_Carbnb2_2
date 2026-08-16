@@ -13,13 +13,24 @@ import android.net.NetworkRequest;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.view.Gravity;
+import android.view.View;
+import android.view.ViewGroup;
 import android.webkit.PermissionRequest;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebSettings;
 import android.webkit.WebView;
+import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.ProgressBar;
+import android.widget.TextView;
 import android.widget.Toast;
+
+import java.net.HttpURLConnection;
+import java.net.URL;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
@@ -42,7 +53,7 @@ public class MainActivity extends BridgeActivity {
     private static final int CAMERA_PERMISSION_REQUEST_CODE = 1001;
 
     // The live site (must match capacitor.config.json's server.url).
-    private static final String REMOTE_URL = "https://carbnb.free.je";
+    private static final String REMOTE_URL = "https://carbnb.ifree.page";
 
     // Bundled locally inside the app (mobileapp/www/offline.html) - shown
     // instead of Android's plain default error page when there's no
@@ -116,6 +127,8 @@ public class MainActivity extends BridgeActivity {
 
     private WebView webView;
     private ConnectivityManager.NetworkCallback networkCallback;
+    private View splashOverlay;
+    private boolean splashHidden = false;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -130,6 +143,31 @@ public class MainActivity extends BridgeActivity {
         WebView.setWebContentsDebuggingEnabled(true);
 
         webView = this.bridge.getWebView();
+
+        // Sets the WebView's own background to the app's dark theme
+        // immediately, instead of the default white - this alone removes
+        // most of the jarring white flash while the live page loads,
+        // even before the splash overlay below is visible.
+        webView.setBackgroundColor(0xFF1e1e1e);
+
+        // Explicitly enable WebView's own caching, so static assets
+        // (CSS, JS, images, the face-api.js model files) that don't
+        // change between visits get reused instead of re-downloaded
+        // every time - a genuine speed improvement on repeat app opens.
+        WebSettings settings = webView.getSettings();
+        settings.setCacheMode(WebSettings.LOAD_DEFAULT);
+        settings.setDomStorageEnabled(true);
+
+        setupSplashOverlay();
+
+        // Warms up the connection to the live site in the background the
+        // instant the app opens - resolving DNS and completing the HTTPS
+        // handshake ahead of time, so that work is already done by the
+        // time the WebView actually requests the real page a moment
+        // later. This is a genuine speed improvement (unlike the splash
+        // screen, which only covers the wait) - it can measurably cut
+        // load time, especially on slower mobile connections.
+        preconnectToRemoteHost();
 
         registerNetworkCallback();
 
@@ -211,6 +249,16 @@ public class MainActivity extends BridgeActivity {
                 if (request.isForMainFrame() && !request.getUrl().toString().equals(OFFLINE_URL)) {
                     view.loadUrl(OFFLINE_URL);
                 }
+            }
+
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                // The first time ANY page finishes loading (the real
+                // site, the offline screen, or the camera permission
+                // screen), there's real content on screen - safe to hide
+                // the splash overlay.
+                hideSplashOverlay();
             }
         });
 
@@ -412,6 +460,114 @@ public class MainActivity extends BridgeActivity {
         if (webView != null) {
             webView.loadUrl(target);
         }
+    }
+
+    // ------------------------------------------------------------------
+    // Splash overlay - covers the WebView's initial blank white page
+    // while the live site loads over the network, so the app never
+    // shows an empty white screen. Hidden automatically once the first
+    // page (real site, offline screen, or camera permission screen)
+    // finishes loading.
+    // ------------------------------------------------------------------
+
+    private void setupSplashOverlay() {
+        FrameLayout overlay = new FrameLayout(this);
+        overlay.setBackgroundColor(0xFF1e1e1e);
+        overlay.setClickable(true);
+
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setGravity(Gravity.CENTER);
+
+        FrameLayout.LayoutParams contentParams = new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            Gravity.CENTER
+        );
+        content.setLayoutParams(contentParams);
+
+        TextView logo = new TextView(this);
+        android.text.SpannableString logoText = new android.text.SpannableString("Carbnb");
+        logoText.setSpan(
+            new android.text.style.ForegroundColorSpan(0xFF00bfff),
+            0, 3, 0
+        );
+        logoText.setSpan(
+            new android.text.style.ForegroundColorSpan(0xFFff8c00),
+            3, 6, 0
+        );
+        logo.setText(logoText);
+        logo.setTextSize(28);
+        logo.setTypeface(logo.getTypeface(), android.graphics.Typeface.BOLD);
+        logo.setGravity(Gravity.CENTER);
+
+        LinearLayout.LayoutParams logoParams = new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        logoParams.bottomMargin = 48;
+        logo.setLayoutParams(logoParams);
+
+        ProgressBar spinner = new ProgressBar(this);
+        spinner.getIndeterminateDrawable().setColorFilter(
+            0xFFff8c00, android.graphics.PorterDuff.Mode.SRC_IN
+        );
+
+        content.addView(logo);
+        content.addView(spinner);
+        overlay.addView(content);
+
+        this.splashOverlay = overlay;
+
+        addContentView(
+            overlay,
+            new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        );
+
+        // Safety net: if for any reason onPageFinished never fires (very
+        // unlikely, but better safe than a permanently stuck splash),
+        // hide it automatically after 8 seconds regardless.
+        overlay.postDelayed(this::hideSplashOverlay, 8000);
+    }
+
+    private void hideSplashOverlay() {
+        if (splashHidden || splashOverlay == null) {
+            return;
+        }
+        splashHidden = true;
+        runOnUiThread(() -> splashOverlay.setVisibility(View.GONE));
+    }
+
+    // Opens a connection to the live site on a background thread the
+    // instant the app starts, before the WebView itself has asked for
+    // anything. This resolves DNS and completes the HTTPS handshake
+    // ahead of time, so when the WebView's real request goes out a
+    // moment later, that setup work is already done - a genuine
+    // reduction in load time, not just a cosmetic cover for the wait.
+    private void preconnectToRemoteHost() {
+        new Thread(() -> {
+            HttpURLConnection connection = null;
+            try {
+                URL url = new URL(REMOTE_URL);
+                connection = (HttpURLConnection) url.openConnection();
+                connection.setConnectTimeout(5000);
+                connection.setReadTimeout(5000);
+                connection.setRequestMethod("HEAD");
+                connection.connect();
+                connection.getResponseCode();
+            } catch (Exception e) {
+                // Not fatal - this is purely an optimization. If it
+                // fails, the WebView's own normal request still proceeds
+                // exactly as it would have anyway.
+            } finally {
+                if (connection != null) {
+                    connection.disconnect();
+                }
+            }
+        }).start();
     }
 
     private boolean isNetworkAvailable() {

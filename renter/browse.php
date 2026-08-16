@@ -671,7 +671,7 @@ function build_vehicle_image_path($value): string {
     }
 
     // ============================================================
-    // GET THE BASE URL FOR API CALLS
+    // FIXED: Get the base URL for API calls
     // ============================================================
     function getBaseUrl() {
         var protocol = window.location.protocol;
@@ -680,7 +680,7 @@ function build_vehicle_image_path($value): string {
     }
 
     // ============================================================
-    // GET THE CORRECT API PATH (DYNAMIC - WORKS ANYWHERE)
+    // FIXED: Get the API path - Works on InfinityFree
     // ============================================================
     function getApiPath() {
         var path = window.location.pathname;
@@ -689,14 +689,17 @@ function build_vehicle_image_path($value): string {
         // Go up one level (from /renter/ to /)
         var projectPath = basePath.substring(0, basePath.lastIndexOf('/') + 1);
         // If projectPath is empty or just '/', use '/'
-        if (projectPath === '') {
+        if (projectPath === '' || projectPath === '/') {
+            // For InfinityFree, the project is typically at the root
+            // If your project is in a subfolder, change this to that folder name
+            // Example: '/carbnb/'
             projectPath = '/';
         }
         return projectPath;
     }
 
     // ============================================================
-    // SEND GPS LOCATION TO SERVER (USING watchPosition)
+    // FIXED: SEND GPS LOCATION TO SERVER
     // ============================================================
     function sendLocationToServer(position) {
         var latitude = position.coords.latitude;
@@ -713,13 +716,14 @@ function build_vehicle_image_path($value): string {
         formData.append('recorded_at', recorded_at);
 
         // ============================================================
-        // FIXED: Build the API URL dynamically - no hardcoded /carbnb/
+        // FIXED: Build the API URL - Works on any domain
         // ============================================================
         var projectPath = getApiPath();
         var apiUrl = getBaseUrl() + projectPath + 'admin/location_tracker.php';
         
         console.log('📍 API URL:', apiUrl);
         console.log('📡 Project Path:', projectPath);
+        console.log('📡 Full URL:', apiUrl);
 
         return fetch(apiUrl, {
             method: 'POST',
@@ -729,8 +733,9 @@ function build_vehicle_image_path($value): string {
             body: formData.toString()
         })
         .then(function(response) {
+            console.log('📡 Response status:', response.status);
             if (!response.ok) {
-                throw new Error('HTTP ' + response.status);
+                throw new Error('HTTP ' + response.status + ': ' + response.statusText);
             }
             return response.json();
         })
@@ -747,18 +752,47 @@ function build_vehicle_image_path($value): string {
     // START CONTINUOUS GPS TRACKING (watchPosition)
     // ============================================================
     function startContinuousTracking() {
+        // Check if geolocation is supported
         if (!navigator.geolocation) {
             setModalStatus('❌ Geolocation is not supported on this device.', 'error');
+            allowBtn.disabled = false;
+            allowBtn.textContent = 'Try Again';
             return false;
+        }
+
+        // Check if HTTPS is required (most mobile browsers)
+        var isSecure = window.location.protocol === 'https:' || 
+                       window.location.hostname === 'localhost' || 
+                       window.location.hostname === '127.0.0.1';
+        
+        if (!isSecure) {
+            console.warn('⚠️ Geolocation may be blocked because this page is not served over HTTPS.');
+            console.warn('📍 Current protocol:', window.location.protocol);
+            console.warn('📍 Current hostname:', window.location.hostname);
+            setModalStatus('⚠️ This page is not secure. GPS works best over HTTPS or localhost.', 'error');
+            // Continue anyway - let the browser decide
         }
 
         setModalStatus('📡 Getting real GPS location...', 'loading');
         allowBtn.disabled = true;
         allowBtn.textContent = 'Getting GPS...';
 
+        // Set a timeout to handle slow GPS
+        var gpsTimeout = setTimeout(function() {
+            console.warn('⏱️ GPS timeout - trying to get location took too long');
+            setModalStatus('⏱️ GPS request is taking longer than expected. Please ensure GPS is enabled.', 'error');
+            allowBtn.disabled = false;
+            allowBtn.textContent = 'Try Again';
+            isProcessing = false;
+        }, 20000);
+
         navigator.geolocation.getCurrentPosition(
+            // SUCCESS
             function(position) {
+                clearTimeout(gpsTimeout);
                 console.log('✅ GPS acquired:', position.coords.latitude, position.coords.longitude);
+                console.log('📍 Accuracy:', position.coords.accuracy, 'meters');
+                
                 setModalStatus('📍 GPS acquired! Saving location...', 'loading');
 
                 sendLocationToServer(position)
@@ -769,6 +803,7 @@ function build_vehicle_image_path($value): string {
                         
                         setModalStatus('✅ GPS tracking active! Redirecting...', 'success');
                         
+                        // Start continuous tracking with watchPosition
                         if (watchId === null) {
                             watchId = navigator.geolocation.watchPosition(
                                 function(newPosition) {
@@ -804,16 +839,28 @@ function build_vehicle_image_path($value): string {
                         isProcessing = false;
                     });
             },
+            // ERROR - SHOW ACTUAL GEOLOCATION ERROR
             function(error) {
+                clearTimeout(gpsTimeout);
                 console.error('❌ GPS Error:', error);
-                var message = '⚠️ Unable to access GPS. ';
-                if (error.code === 1) {
-                    message = '❌ Location permission denied. You must allow GPS access to book a car.';
-                } else if (error.code === 2) {
-                    message = '⚠️ GPS unavailable. Please check your device GPS and try again.';
-                } else if (error.code === 3) {
-                    message = '⏱️ GPS request timed out. Please try again.';
+                console.error('Error code:', error.code);
+                console.error('Error message:', error.message);
+                
+                var message = '';
+                switch(error.code) {
+                    case 1: // PERMISSION_DENIED
+                        message = '❌ Location permission denied. You must allow GPS access in your browser settings.';
+                        break;
+                    case 2: // POSITION_UNAVAILABLE
+                        message = '⚠️ GPS unavailable. Please enable GPS on your device and try again.';
+                        break;
+                    case 3: // TIMEOUT
+                        message = '⏱️ GPS request timed out. Please ensure GPS is enabled and try again.';
+                        break;
+                    default:
+                        message = '⚠️ GPS error: ' + error.message;
                 }
+                
                 setModalStatus(message, 'error');
                 allowBtn.disabled = false;
                 allowBtn.textContent = 'Try Again';
@@ -858,6 +905,7 @@ function build_vehicle_image_path($value): string {
         
         modal.classList.add('show');
         
+        // Remove old event listeners by cloning buttons
         var newAllowBtn = allowBtn.cloneNode(true);
         var newDenyBtn = denyBtn.cloneNode(true);
         allowBtn.parentNode.replaceChild(newAllowBtn, allowBtn);

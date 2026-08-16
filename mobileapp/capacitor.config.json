@@ -3,7 +3,7 @@
   "appName": "Carbnb",
   "webDir": "www",
   "server": {
-    "url": "https://carbnb.free.je",
+    "url": "https://carbnb.ifree.page",
     "cleartextTrafficPermitted": true
   }
 }
