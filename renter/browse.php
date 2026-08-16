@@ -281,7 +281,7 @@ function build_vehicle_image_path($value): string {
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Browse Cars | Carbnb</title>
 <link rel="stylesheet" href="../bootstrap-5.3.8-dist/css/bootstrap.min.css">
 <link rel="stylesheet" href="css/renter_style.css?v=4">
@@ -313,7 +313,7 @@ function build_vehicle_image_path($value): string {
 }
 
 /* ============================================================
-   LOCATION PERMISSION MODAL - IMPROVED
+   LOCATION PERMISSION MODAL - IMPROVED FOR MOBILE
    ============================================================ */
 .location-modal-overlay {
     display: none;
@@ -327,6 +327,7 @@ function build_vehicle_image_path($value): string {
     justify-content: center;
     align-items: center;
     backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
 }
 .location-modal-overlay.show {
     display: flex;
@@ -334,13 +335,14 @@ function build_vehicle_image_path($value): string {
 .location-modal {
     background: #fff;
     border-radius: 20px;
-    padding: 35px 40px;
-    max-width: 440px;
+    padding: 30px 28px;
+    max-width: 420px;
     width: 92%;
     box-shadow: 0 25px 80px rgba(0,0,0,0.35);
     text-align: center;
     animation: modalFadeIn 0.4s ease;
     position: relative;
+    margin: 20px;
 }
 @keyframes modalFadeIn {
     from { opacity: 0; transform: scale(0.92) translateY(-20px); }
@@ -368,14 +370,14 @@ function build_vehicle_image_path($value): string {
     flex-wrap: wrap;
 }
 .location-modal .modal-actions button {
-    padding: 12px 32px;
+    padding: 12px 28px;
     border: none;
     border-radius: 10px;
     font-weight: 600;
     cursor: pointer;
     font-size: 15px;
     transition: all 0.2s;
-    min-width: 120px;
+    min-width: 110px;
 }
 .location-modal .btn-allow {
     background: #0d6efd;
@@ -435,7 +437,7 @@ function build_vehicle_image_path($value): string {
 <body data-user-id="<?php echo (int) $user_id; ?>" data-current-status="<?php echo htmlspecialchars($renter['status'] ?? 'pending'); ?>">
 
 <!-- ============================================================
-     LOCATION PERMISSION MODAL - IMPROVED
+     LOCATION PERMISSION MODAL
      ============================================================ -->
 <div id="locationModal" class="location-modal-overlay">
     <div class="location-modal">
@@ -550,19 +552,20 @@ function build_vehicle_image_path($value): string {
     const currentFilter = new URLSearchParams(window.location.search).get('seater') || 'all';
 
     // ============================================================
-    // LOCATION PERMISSION MODAL - IMPROVED
+    // LOCATION PERMISSION MODAL
     // ============================================================
     const modal = document.getElementById('locationModal');
     const allowBtn = document.getElementById('modalAllowBtn');
     const denyBtn = document.getElementById('modalDenyBtn');
     const modalStatus = document.getElementById('modalStatus');
     let pendingCarId = null;
+    let watchId = null;
     let isLocationGranted = false;
     let isTracking = false;
     let isProcessing = false;
 
     // ============================================================
-    // UPDATE MODAL STATUS WITH STABLE MESSAGES
+    // UPDATE MODAL STATUS
     // ============================================================
     function setModalStatus(message, type) {
         modalStatus.textContent = message;
@@ -668,68 +671,123 @@ function build_vehicle_image_path($value): string {
     }
 
     // ============================================================
-    // REAL GPS LOCATION SENDING - WITH BETTER ERROR HANDLING
+    // GET THE BASE URL FOR API CALLS
+    // ============================================================
+    function getBaseUrl() {
+        var protocol = window.location.protocol;
+        var host = window.location.host;
+        return protocol + '//' + host;
+    }
+
+    // ============================================================
+    // GET THE CORRECT API PATH (DYNAMIC - WORKS ANYWHERE)
+    // ============================================================
+    function getApiPath() {
+        var path = window.location.pathname;
+        // Remove the filename (browse.php) to get the base path
+        var basePath = path.substring(0, path.lastIndexOf('/'));
+        // Go up one level (from /renter/ to /)
+        var projectPath = basePath.substring(0, basePath.lastIndexOf('/') + 1);
+        // If projectPath is empty or just '/', use '/'
+        if (projectPath === '') {
+            projectPath = '/';
+        }
+        return projectPath;
+    }
+
+    // ============================================================
+    // SEND GPS LOCATION TO SERVER (USING watchPosition)
     // ============================================================
     function sendLocationToServer(position) {
-        const payload = new URLSearchParams({
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            accuracy: position.coords.accuracy || 0,
-            recorded_at: new Date().toISOString().slice(0,19).replace("T"," ")
-        });
+        var latitude = position.coords.latitude;
+        var longitude = position.coords.longitude;
+        var accuracy = position.coords.accuracy || 0;
+        var recorded_at = new Date().toISOString().slice(0,19).replace("T"," ");
 
-        console.log('📍 Sending location:', payload.toString());
+        console.log('📍 Sending GPS:', latitude, longitude, accuracy);
 
-        setModalStatus('⏳ Sending location to server...', 'loading');
+        var formData = new URLSearchParams();
+        formData.append('latitude', latitude);
+        formData.append('longitude', longitude);
+        formData.append('accuracy', accuracy);
+        formData.append('recorded_at', recorded_at);
 
-        return fetch("../admin/location_tracker.php", {
-            method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: payload.toString()
+        // ============================================================
+        // FIXED: Build the API URL dynamically - no hardcoded /carbnb/
+        // ============================================================
+        var projectPath = getApiPath();
+        var apiUrl = getBaseUrl() + projectPath + 'admin/location_tracker.php';
+        
+        console.log('📍 API URL:', apiUrl);
+        console.log('📡 Project Path:', projectPath);
+
+        return fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: formData.toString()
         })
-        .then(async function(response) {
-            const data = await response.json().catch(() => ({}));
+        .then(function(response) {
+            if (!response.ok) {
+                throw new Error('HTTP ' + response.status);
+            }
+            return response.json();
+        })
+        .then(function(data) {
             console.log('📡 Server response:', data);
-            
-            if (!response.ok || !data.success) {
-                throw new Error(data.message || data.debug || "Server rejected location");
+            if (!data.success) {
+                throw new Error(data.message || 'Server error');
             }
             return data;
         });
     }
 
     // ============================================================
-    // REAL GPS LOCATION TRACKING - WITH STABLE FEEDBACK
+    // START CONTINUOUS GPS TRACKING (watchPosition)
     // ============================================================
-    function startLocationTracking() {
-        if (isProcessing) return;
-        isProcessing = true;
-
+    function startContinuousTracking() {
         if (!navigator.geolocation) {
             setModalStatus('❌ Geolocation is not supported on this device.', 'error');
-            allowBtn.disabled = false;
-            allowBtn.textContent = 'Try Again';
-            isProcessing = false;
-            return;
+            return false;
         }
 
-        setModalStatus('📡 Getting your real GPS location...', 'loading');
+        setModalStatus('📡 Getting real GPS location...', 'loading');
         allowBtn.disabled = true;
         allowBtn.textContent = 'Getting GPS...';
 
         navigator.geolocation.getCurrentPosition(
-            // SUCCESS
-            function (position) {
+            function(position) {
                 console.log('✅ GPS acquired:', position.coords.latitude, position.coords.longitude);
                 setModalStatus('📍 GPS acquired! Saving location...', 'loading');
 
                 sendLocationToServer(position)
                     .then(function(data) {
-                        console.log('✅ Location saved!', data);
+                        console.log('✅ First location saved!');
                         isLocationGranted = true;
                         isTracking = true;
                         
-                        setModalStatus('✅ Real GPS location saved! Redirecting...', 'success');
+                        setModalStatus('✅ GPS tracking active! Redirecting...', 'success');
+                        
+                        if (watchId === null) {
+                            watchId = navigator.geolocation.watchPosition(
+                                function(newPosition) {
+                                    console.log('🔄 GPS update:', newPosition.coords.latitude, newPosition.coords.longitude);
+                                    sendLocationToServer(newPosition).catch(function(err) {
+                                        console.log('GPS update send error:', err.message);
+                                    });
+                                },
+                                function(error) {
+                                    console.warn('GPS watch error:', error.message);
+                                },
+                                {
+                                    enableHighAccuracy: true,
+                                    timeout: 30000,
+                                    maximumAge: 5000
+                                }
+                            );
+                            console.log('🔄 Continuous GPS tracking started with watchId:', watchId);
+                        }
                         
                         setTimeout(function() {
                             modal.classList.remove('show');
@@ -746,10 +804,9 @@ function build_vehicle_image_path($value): string {
                         isProcessing = false;
                     });
             },
-            // ERROR
-            function (error) {
+            function(error) {
                 console.error('❌ GPS Error:', error);
-                let message = '⚠️ Unable to access GPS. ';
+                var message = '⚠️ Unable to access GPS. ';
                 if (error.code === 1) {
                     message = '❌ Location permission denied. You must allow GPS access to book a car.';
                 } else if (error.code === 2) {
@@ -762,13 +819,25 @@ function build_vehicle_image_path($value): string {
                 allowBtn.textContent = 'Try Again';
                 isProcessing = false;
             },
-            // OPTIONS
-            { 
-                enableHighAccuracy: true, 
-                timeout: 30000, 
-                maximumAge: 5000 
+            {
+                enableHighAccuracy: true,
+                timeout: 30000,
+                maximumAge: 5000
             }
         );
+        return true;
+    }
+
+    // ============================================================
+    // STOP CONTINUOUS GPS TRACKING
+    // ============================================================
+    function stopContinuousTracking() {
+        if (watchId !== null) {
+            navigator.geolocation.clearWatch(watchId);
+            watchId = null;
+            console.log('🛑 GPS tracking stopped');
+        }
+        isTracking = false;
     }
 
     // ============================================================
@@ -782,7 +851,6 @@ function build_vehicle_image_path($value): string {
             return;
         }
 
-        // Reset modal state
         isProcessing = false;
         allowBtn.disabled = false;
         allowBtn.textContent = 'Allow Location';
@@ -790,18 +858,18 @@ function build_vehicle_image_path($value): string {
         
         modal.classList.add('show');
         
-        // Remove old event listeners by cloning buttons
-        const newAllowBtn = allowBtn.cloneNode(true);
-        const newDenyBtn = denyBtn.cloneNode(true);
+        var newAllowBtn = allowBtn.cloneNode(true);
+        var newDenyBtn = denyBtn.cloneNode(true);
         allowBtn.parentNode.replaceChild(newAllowBtn, allowBtn);
         denyBtn.parentNode.replaceChild(newDenyBtn, denyBtn);
         
-        // Update references
-        const updatedAllowBtn = document.getElementById('modalAllowBtn');
-        const updatedDenyBtn = document.getElementById('modalDenyBtn');
+        var updatedAllowBtn = document.getElementById('modalAllowBtn');
+        var updatedDenyBtn = document.getElementById('modalDenyBtn');
         
         updatedAllowBtn.onclick = function() {
-            startLocationTracking();
+            if (!isProcessing) {
+                startContinuousTracking();
+            }
         };
         
         updatedDenyBtn.onclick = function() {
@@ -829,14 +897,14 @@ function build_vehicle_image_path($value): string {
 
     bindBookNowButtons();
 
-    // Close modal on outside click only if not processing
     modal.addEventListener('click', function(e) {
         if (e.target === this && !isProcessing) {
-            // Don't close if error is shown - user must choose
-            if (!modalStatus.classList.contains('error')) {
-                // Only close if no pending action
-            }
+            // Only close if no error
         }
+    });
+
+    window.addEventListener('beforeunload', function() {
+        stopContinuousTracking();
     });
 
 })();
