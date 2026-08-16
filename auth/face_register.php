@@ -62,7 +62,7 @@ $form_token = $_SESSION['face_form_token'];
 </div>
 
 <script src="../face-api.js-master/dist/face-api.min.js"></script>
-<script src="script_capture.js?v=20260816"></script>
+<script src="script_capture.js?v=20260819"></script>
 
 </body>
 </html>
