@@ -4,6 +4,7 @@ import android.Manifest;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.net.ConnectivityManager;
 import android.net.Network;
@@ -11,6 +12,7 @@ import android.net.NetworkCapabilities;
 import android.net.NetworkRequest;
 import android.net.Uri;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.webkit.PermissionRequest;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
@@ -51,6 +53,29 @@ public class MainActivity extends BridgeActivity {
     // The website's offline.html page sends the browser here when the
     // user taps "Retry" - intercepted below in shouldOverrideUrlLoading.
     private static final String RETRY_URL = "carbnb://retry";
+
+    // A local screen (mobileapp/www/camera_permission.html) shown before
+    // face registration/verification, so camera access is requested
+    // through a direct, native-controlled user tap - more reliable than
+    // depending on the website's own JS to trigger it correctly every time.
+    private static final String CAMERA_PERMISSION_URL = "file:///android_asset/public/camera_permission.html";
+    private static final String REQUEST_CAMERA_URL = "carbnb://request-camera";
+    private static final String SKIP_CAMERA_URL = "carbnb://skip-camera";
+
+    // Any URL containing one of these segments shows the camera
+    // permission screen first (if not already granted) before loading.
+    private static final String[] FACE_AUTH_PATH_SEGMENTS = {
+        "face_register.php",
+        "face_verify.php"
+    };
+
+    // Remembers which page the user was actually trying to reach while
+    // they're on the camera permission screen, so we can continue there
+    // once they respond (whether Allow, Deny, or Not now).
+    private String pendingFaceUrl;
+
+    private static final String PREFS_NAME = "carbnb_prefs";
+    private static final String PREF_CAMERA_ASKED_BEFORE = "camera_permission_asked_before";
 
     // Holds the website's pending camera request while we wait for the
     // user to respond to Android's own "Allow Carbnb to use the camera?"
@@ -123,9 +148,20 @@ public class MainActivity extends BridgeActivity {
                     return true;
                 }
 
+                if (url.startsWith(REQUEST_CAMERA_URL)) {
+                    requestCameraPermissionNatively();
+                    return true;
+                }
+
+                if (url.startsWith(SKIP_CAMERA_URL)) {
+                    continueToPendingFaceUrl();
+                    return true;
+                }
+
                 String path = request.getUrl().getPath();
                 if (path != null) {
                     String lowerPath = path.toLowerCase();
+
                     for (String blocked : BLOCKED_PATH_SEGMENTS) {
                         if (lowerPath.contains(blocked)) {
                             Toast.makeText(
@@ -135,6 +171,22 @@ public class MainActivity extends BridgeActivity {
                             ).show();
                             return true;
                         }
+                    }
+
+                    boolean isFaceAuthPage = false;
+                    for (String segment : FACE_AUTH_PATH_SEGMENTS) {
+                        if (lowerPath.contains(segment)) {
+                            isFaceAuthPage = true;
+                            break;
+                        }
+                    }
+
+                    if (isFaceAuthPage
+                            && ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.CAMERA)
+                                != PackageManager.PERMISSION_GRANTED) {
+                        pendingFaceUrl = url;
+                        view.loadUrl(CAMERA_PERMISSION_URL);
+                        return true;
                     }
                 }
 
@@ -259,24 +311,98 @@ public class MainActivity extends BridgeActivity {
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
 
-        if (requestCode == CAMERA_PERMISSION_REQUEST_CODE && pendingWebPermissionRequest != null) {
-            boolean granted = grantResults.length > 0
-                && grantResults[0] == PackageManager.PERMISSION_GRANTED;
+        if (requestCode != CAMERA_PERMISSION_REQUEST_CODE) {
+            return;
+        }
 
+        boolean granted = grantResults.length > 0
+            && grantResults[0] == PackageManager.PERMISSION_GRANTED;
+
+        // Case 1: the website's own JS (getUserMedia) triggered this.
+        if (pendingWebPermissionRequest != null) {
             if (granted) {
                 pendingWebPermissionRequest.grant(
                     new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE}
                 );
             } else {
                 pendingWebPermissionRequest.deny();
+            }
+            pendingWebPermissionRequest = null;
+        }
+
+        // Case 2: our own native camera_permission.html screen triggered this.
+        if (pendingFaceUrl != null) {
+            if (!granted) {
                 Toast.makeText(
                     this,
                     "Camera permission is needed for face registration/verification.",
                     Toast.LENGTH_LONG
                 ).show();
             }
+            continueToPendingFaceUrl();
+        }
+    }
 
-            pendingWebPermissionRequest = null;
+    // Called when the user taps "Allow Camera Access" on our local
+    // camera_permission.html screen. Handles the case Android otherwise
+    // handles silently: if the user denied camera access before, Android
+    // stops showing its own popup on later requests - so tapping Allow
+    // would appear to do nothing at all. We track whether we've asked
+    // before ourselves, and once that's true and Android still won't
+    // show a prompt, send the user to the app's system Settings page
+    // instead, where they can grant it manually.
+    private void requestCameraPermissionNatively() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+                == PackageManager.PERMISSION_GRANTED) {
+            continueToPendingFaceUrl();
+            return;
+        }
+
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        boolean askedBefore = prefs.getBoolean(PREF_CAMERA_ASKED_BEFORE, false);
+        boolean canShowSystemPrompt = ActivityCompat.shouldShowRequestPermissionRationale(
+            this, Manifest.permission.CAMERA
+        );
+
+        if (askedBefore && !canShowSystemPrompt) {
+            // Android has permanently stopped showing its own popup for
+            // this permission - the only way forward is the app's
+            // Settings page.
+            Toast.makeText(
+                this,
+                "Camera was previously denied. Enable it in Settings > Permissions.",
+                Toast.LENGTH_LONG
+            ).show();
+
+            Intent settingsIntent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+            settingsIntent.setData(Uri.fromParts("package", getPackageName(), null));
+            try {
+                startActivity(settingsIntent);
+            } catch (ActivityNotFoundException e) {
+                // No settings screen available - fall back to continuing
+                // without camera access rather than getting stuck.
+            }
+            continueToPendingFaceUrl();
+            return;
+        }
+
+        prefs.edit().putBoolean(PREF_CAMERA_ASKED_BEFORE, true).apply();
+
+        ActivityCompat.requestPermissions(
+            this,
+            new String[]{Manifest.permission.CAMERA},
+            CAMERA_PERMISSION_REQUEST_CODE
+        );
+    }
+
+    // Continues to whichever page the user was originally trying to
+    // reach (face registration/verification) before the camera
+    // permission screen interrupted them.
+    private void continueToPendingFaceUrl() {
+        String target = pendingFaceUrl != null ? pendingFaceUrl : REMOTE_URL;
+        pendingFaceUrl = null;
+        if (webView != null) {
+            webView.loadUrl(target);
         }
     }
 
