@@ -595,7 +595,7 @@ if ($ajax && ($_GET['section'] ?? '') === 'notifications') {
     })();
 
     // ============================================================
-    // LOCATION STATUS - Live refresh every 10 seconds
+    // LOCATION STATUS - Live refresh every 10 seconds (FIXED)
     // ============================================================
     (function () {
       function refreshLocationStatus() {
@@ -638,7 +638,8 @@ if ($ajax && ($_GET['section'] ?? '') === 'notifications') {
           });
       }
 
-      // Refresh every 10 seconds
+      // FIXED: Call immediately on page load, then every 10 seconds
+      refreshLocationStatus();
       setInterval(refreshLocationStatus, 10000);
     })();
 

@@ -298,7 +298,10 @@ $registeredFaceDescriptor = json_decode($user['face_descriptor'], true);
         Loading face verification...
     </div>
 
-    <button id="verifyBtn" type="button" disabled>
+    <!-- ============================================================
+         FIXED: Removed 'disabled' attribute - JavaScript now controls this
+         ============================================================ -->
+    <button id="verifyBtn" type="button">
         Verify Face
     </button>
 
